@@ -1,0 +1,26 @@
+# Streamlit settings for the app: the colours (theme) and server behaviour.
+# The colours are a dark navy scheme; app_pages/theme.py adds the gradient
+# behind the pages (a gradient cannot be set here).
+
+[theme]
+base = "dark"
+primaryColor = "#4d7cff"                 # buttons, ticks, sliders, the active tab, focus rings
+backgroundColor = "#0b1a3a"              # navy (under the gradient)
+secondaryBackgroundColor = "#13254d"     # inputs, code, table headers
+textColor = "#e6ebf5"
+borderColor = "#2a3f72"
+linkColor = "#8fb0ff"
+dataframeHeaderBackgroundColor = "#13254d"
+
+[theme.sidebar]
+backgroundColor = "#0a1634"              # a darker navy for the sidebar
+secondaryBackgroundColor = "#11224a"
+textColor = "#d6deef"
+borderColor = "#24396b"
+
+[server]
+# Uploads: a case narrative (small), documents of case summaries and saved case databases (larger), in MB.
+maxUploadSize = 50
+
+[browser]
+gatherUsageStats = false

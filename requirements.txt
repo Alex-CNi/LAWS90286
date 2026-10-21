@@ -1,0 +1,16 @@
+# Python packages for Streamlit Community Cloud (choose Python 3.13 under
+# "Advanced settings" when deploying). Versions are pinned so that a rebuild
+# after submission installs exactly what was tested.
+streamlit==1.66.0
+openai==3.35.1
+pydantic==2.13.5
+numpy==2.5.3
+pandas==3.0.5
+python-docx==1.2.0
+pypdf==5.9.0
+
+# ChromaDB (the Lab 2 vector database). Optional: if Streamlit Cloud fails to
+# install it, delete these two lines; the app then uses exact NumPy search
+# (ChromaDB's search is approximate, so the order can differ slightly).
+chromadb==1.5.9
+pysqlite3-binary==0.5.4.post2; sys_platform == "linux"
