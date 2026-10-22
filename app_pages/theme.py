@@ -3,7 +3,7 @@ app_pages/theme.py — THE LOOK OF THE APP.
 
 The colours and the font (Lato) are set in .streamlit/config.toml. This module adds what the config cannot:
 
-  apply_theme()        CSS for the whole app, added on every page load (streamlit_app.py): the navy gradient,
+  apply_theme()        CSS for the whole app, added on every page load (home.py): the navy gradient,
                        the sidebar tiles, the large light headlines, the white start bar with pill-shaped
                        choices, the offence panel, cards, expanders, buttons, the step pills and the result card
   hero(title, sub)     the large, light headline at the top of a page

@@ -252,7 +252,7 @@ them. Clear the database afterwards — those cases are made up.
 | At least 5 AI calls per run | Always 7 (9 with revision): 1 extraction, 4 analyses, 1 synthesis, 1 audit; with the simple input, 8 (10): the sorting call, then the same 7. Shown as “AI calls this run” and in the run log. Out-of-scope inputs are rejected before AI call 1, so no run stops early. Calls whose results were replaced (facts confirmed again, a description sorted again) are listed separately and not counted; a sorting reused by a later run of the same case is listed there as reused |
 | User input | Simple input (a description and a few optional answers, sorted by an AI call) or the detailed form; narrative text, file upload (.txt, .md, .docx, .pdf); documents of case summaries for the case database (.docx, .pdf, .txt, .md, .html) |
 | Output | On-screen report; Word and Markdown downloads |
-| Streamlit Cloud + API Credentials sidebar module | `streamlit_app.py`, `api_key.py` (see §6). If a model is not available to the marker's key, the app falls back to another model and says so in the run log |
+| Streamlit Cloud + API Credentials sidebar module | `home.py`, `api_key.py` (see §6). If a model is not available to the marker's key, the app falls back to another model and says so in the run log |
 | No developer key in the app | The key is typed by the user and kept only in their session; `.env` (development only) is in `.gitignore` |
 | README with URL, 3 test cases and artefacts | This file (§2: the three test cases, and ten more); `test_cases/` |
 
@@ -270,7 +270,7 @@ The chunking calls on the Case database page are not part of any run and are not
 1. **Run locally**
    ```bash
    pip install -r requirements.txt
-   streamlit run streamlit_app.py
+   streamlit run home.py
    ```
 2. **Build the search index once** (embeds the knowledge base, ~US$0.06):
    ```bash
@@ -284,7 +284,7 @@ The chunking calls on the Case database page are not part of any run and are not
    says so, rather than stopping. The index can also be built from the Knowledge base page with a user's key, but it is
    then lost whenever Streamlit Cloud restarts the app.
 3. **Deploy on Streamlit Community Cloud:** *Create app* → this repository → branch `main` → main file
-   `streamlit_app.py` → *Advanced settings* → Python **3.13** → *Deploy*. No secrets are needed (do **not** add an
+   `home.py` → *Advanced settings* → Python **3.13** → *Deploy*. No secrets are needed (do **not** add an
    OpenAI key to the app's secrets).
 4. **Access for marking:** if the repository is private, add the teacher as a collaborator on GitHub, and in the app's
    *Share* settings make the app public (an app from a private repository is private by default) or invite the
@@ -320,7 +320,7 @@ in practice (ChromaDB's search is approximate).
 safety changes:
 1. the text box is a password field;
 2. the key is shown masked (`sk-…abcd`) in the sidebar instead of being printed in full on the page;
-3. its code is wrapped in a function that `streamlit_app.py` calls on every page load (a plain `import` runs a
+3. its code is wrapped in a function that `home.py` calls on every page load (a plain `import` runs a
    module's code only once per server, so the sidebar would vanish after the first page load).
 
 The key is held only in the session's memory on the server (`st.session_state`), is never written to `os.environ`, a

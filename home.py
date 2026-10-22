@@ -1,5 +1,5 @@
 """
-streamlit_app.py — THE ENTRY POINT (Streamlit Cloud runs this file).
+home.py — THE ENTRY POINT (Streamlit Cloud runs this file).
 
 On every page load it:
   1. sets up the page, its look (app_pages/theme.py, .streamlit/config.toml) and the logo (assets/);
@@ -7,7 +7,7 @@ On every page load it:
      model settings;
   3. runs the page the user chose (app_pages/).
 
-Run locally with:   streamlit run streamlit_app.py
+Run locally with:   streamlit run home.py
 """
 
 import streamlit as st

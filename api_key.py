@@ -12,7 +12,7 @@ Three changes, all for safety (noted in README.md):
   2. The last line no longer prints the whole key on the page; it shows a
      masked status ("sk-…abcd") in the sidebar instead.
   3. The module's top-level code is wrapped in render_sidebar_module(), which
-     streamlit_app.py calls on every rerun. (Python runs a module's top-level
+     home.py calls on every rerun. (Python runs a module's top-level
      code only once per server process, so a plain `import api_key` would draw
      the sidebar only for the first visitor's first page load.)
 

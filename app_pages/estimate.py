@@ -24,7 +24,7 @@ State that must survive moving to another page and back:
   * the current run: st.session_state.run (core/pipeline.py Run) — every result
     is stored there, so moving around never repeats an AI call;
   * the form: Streamlit deletes the values of widgets that are not drawn (e.g.
-    while another page is open). Two things keep them: streamlit_app.py
+    while another page is open). Two things keep them: home.py
     re-assigns every "f_" key at the top of each run (Streamlit's documented
     workaround), and the values are also copied into st.session_state.form_shadow,
     a plain dictionary, which init_form() puts back into any widget key that is
@@ -1301,7 +1301,7 @@ if run and run.framework:
                        + " Manage it on the Case database page.")
             if case_db.usable():
                 # The app leaves out a case that looks like the one being estimated; the user can name others.
-                # The choice is kept across pages (streamlit_app.py); ids no longer in the database are dropped.
+                # The choice is kept across pages (home.py); ids no longer in the database are dropped.
                 ids = [c.id for c in case_db.usable()]
                 if "cdb_exclude" in st.session_state:
                     st.session_state.cdb_exclude = [i for i in st.session_state.cdb_exclude if i in ids]

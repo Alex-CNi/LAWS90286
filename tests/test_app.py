@@ -12,7 +12,7 @@ import core.llm
 from tests.fake_openai import FakeOpenAI
 
 KEY = "sk-test-key-0123456789"
-APP = str(Path(__file__).resolve().parent.parent / "streamlit_app.py")
+APP = str(Path(__file__).resolve().parent.parent / "home.py")
 
 
 @pytest.fixture()

@@ -88,7 +88,7 @@ borderColor = "#24396b"
 
 [server]
 # Uploads: a case narrative (small), documents of case summaries and saved case databases (larger), in MB.
-maxUploadSize = 50
+maxUploadSize = 500
 # Serves the static/ folder (the font files) at app/static/.
 enableStaticServing = true
 

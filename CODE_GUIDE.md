@@ -6,7 +6,7 @@ Every Python file starts with a docstring saying what it does, and is divided in
 ## 1. The files
 
 ```
-streamlit_app.py          Entry point: page setup, the look and the logo, the sidebar (API key + model settings), the pages
+home.py          Entry point: page setup, the look and the logo, the sidebar (API key + model settings), the pages
 .streamlit/config.toml    The theme (dark navy, Lato from static/fonts, heading sizes), static serving, the upload limit
 api_key.py                The course's API Credentials sidebar module (password field, masked status)
 app_pages/
@@ -136,7 +136,7 @@ cases it was given (`Run.comparables`), so later changes to the database do not 
 | A form field | `core/facts.py` → `CaseInput` (and `case_details_text`) and `app_pages/estimate.py` (Step 1, `detailed_input`) | The widget key must be `"f_" + field name`. For the simple input to fill it too: `schemas.SortedCase`, `prompts.SORTING`, `facts.sorted_input` (and `SORTED_CHOICE_FIELDS`, `SIMPLE_DEFAULTS`), `estimate.QUESTION` |
 | What the simple input asks for | `core/facts.py` → `required_for_simple(offender_type)`; `app_pages/estimate.py` → `simple_input` (the optional answers) | A required answer must be given by the description or the user before AI call 1 |
 | The report | `core/report.py` → `build_blocks` | Markdown and Word are rendered from the same blocks |
-| The colours and the font | `.streamlit/config.toml` → `[theme]`, `[[theme.fontFaces]]`, `[theme.sidebar]`; `app_pages/theme.py` → `PALETTE`, `CSS` | Containers opt into a style by their key (`hero_bar`, `search_bar`, `areas`, `status_row`, `card_…`); delete `apply_theme()` in `streamlit_app.py` to go back to the plain theme |
+| The colours and the font | `.streamlit/config.toml` → `[theme]`, `[[theme.fontFaces]]`, `[theme.sidebar]`; `app_pages/theme.py` → `PALETTE`, `CSS` | Containers opt into a style by their key (`hero_bar`, `search_bar`, `areas`, `status_row`, `card_…`); delete `apply_theme()` in `home.py` to go back to the plain theme |
 | The result card | `app_pages/result_card.py` → `card_html` (`headline`, `strip_html`, `agreement_html`, `chips_html`) | Escape every text from the case database or an AI call (`html.escape`); st.html keeps no scripts or inline SVG |
 | The share of similar cases within the range | `core/agreement.py` → `case_outcome`, `place`, `band_agreement`; `config.AGREEMENT_MIN_CASES` | Keep it a check, never a probability (see the rules below) |
 | Revisions allowed | `core/config.py` → `MAX_REVISIONS` | Each revision adds 2 AI calls |
@@ -200,7 +200,7 @@ cases it was given (`Run.comparables`), so later changes to the database do not 
   become cautions; never the contempt's own printed maximum, the facts relied on, a sentence indication or an app rule.
 * **Suggestions:** `pipeline.step_confirm` rebuilds the case from `Run.entered` (the form as entered) plus the
   suggestions ticked now, so unticking one withdraws it.
-* **Form state:** widget keys are `"f_" + field` (and `"s_…"` for the simple input's answers); `streamlit_app.py`
+* **Form state:** widget keys are `"f_" + field` (and `"s_…"` for the simple input's answers); `home.py`
   re-assigns them (and the cases left out, `cdb_exclude`) at the top of every run so their values survive a visit to
   another page, and the form's lasting copy is `st.session_state.form_shadow`, from which the case is built. A field
   shown only conditionally needs nothing extra. Values written by code into a widget's key must be written before the
