@@ -1,5 +1,4 @@
-# Your own OpenAI key for development (used only by scripts/build_index.py).
-# Never commit it.
+# This is only used for the build stage
 .env
 .streamlit/secrets.toml
 
