@@ -38,7 +38,7 @@ model_settings_sidebar()
 
 # 3. Pages
 page = st.navigation([
-    st.Page("app_pages/estimate.py", title="Estimate a sentence", icon="⚖️", default=True),
+    st.Page("app_pages/estimate.py", title="Sentence-After-Lunch.Ai", icon="⚖️", default=True),
     st.Page("app_pages/cases.py", title="Case database", icon="🗂️"),
     st.Page("app_pages/knowledge_base.py", title="Knowledge base", icon="📚"),
     st.Page("app_pages/about.py", title="About and method", icon="ℹ️"),

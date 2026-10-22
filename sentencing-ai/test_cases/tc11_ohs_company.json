@@ -1,0 +1,20 @@
+{
+  "id": "tc11",
+  "title": "Test case 11 — A company's unguarded conveyor (occupational health and safety; a body corporate is fined)",
+  "shows": "A body corporate as the offender: no ages and no questions about a person; no imprisonment, CCO or other order on a person (app policy); the maximum is a fine, and a company's maximum is the one the register prints for a body corporate (9,000 penalty units, against 1,800 for a person); a fine above it is an error.",
+  "form": {
+    "offence_date_end": null,
+    "court": "County Court",
+    "user_role": "other",
+    "plea": "guilty",
+    "plea_timing": "earliest_opportunity",
+    "offender_type": "body_corporate",
+    "prior_convictions": "none",
+    "cooperation": "admissions_only",
+    "indication_given": false,
+    "offence_id": "occupational-health-and-safety-act-2004-vic-21-1-failure-by-employers-to-provide-and-maint",
+    "offence_date": "2022-02-07",
+    "case_name": "WorkSafe v Southgate Packaging Pty Ltd (test case 11)"
+  },
+  "narrative_file": "tc11_narrative.txt"
+}

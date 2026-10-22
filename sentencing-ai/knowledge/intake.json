@@ -1,0 +1,2779 @@
+[
+ {
+  "id": "intake.court",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "framework"
+  ],
+  "field": "court",
+  "type": "enum: Supreme Court | County Court | Magistrates’ Court | Drug Court Division (MC or CC) | Children’s Court (out of scope); for a child in the Supreme or County Court, also whether the child is there only because of a charge of which they were acquitted (yes / no / unknown: CNK, youth.children_in_adult_courts)",
+  "title": "Sentencing court",
+  "statement": "The court determines jurisdictional limits (Magistrates’ Court caps), CCO and youth detention maxima, DATO availability and which orders (e.g. indefinite sentences, electronic monitoring) are available; a child in a higher court only because of a charge of which they were acquitted is sentenced on the remaining uplifted charges as if exclusively governed by the CYFA (CNK).",
+  "needed_for": [
+   "mc.summary_offence_two_years",
+   "mc.two_year_max_summary",
+   "cum.magistrates_5_years",
+   "cco.maximum_term",
+   "yjc.maximum",
+   "order.dato",
+   "indefinite.requirements",
+   "cco.electronic_monitoring",
+   "serious_offender.regime",
+   "suspended.abolished",
+   "mc.indictable_triable_summarily",
+   "order.youth.scope_and_jurisdiction",
+   "cco.combination_one_year",
+   "anc.confiscation.jurisdiction",
+   "order.court_assessment_order",
+   "youth.children_in_adult_courts",
+   "audit.youth_principles"
+  ],
+  "refs": [
+   {
+    "s": "5.1.1.1",
+    "q": "The criminal jurisdiction of the Magistrates’ Court is limited to summary offences and indictable offences triable summarily. For Victorian summary offences, the maximum term of imprisonment is fixed at two years, regardless of what maximum penalty is specified for that offence.",
+    "via": "mc.summary_offence_two_years",
+    "path": "Part B – Principles, Purposes and Considerations > 5 – Circumstances and gravity of the offence > 5.1 – Maximum penalty > 5.1.1 – Identifying the maximum penalty > 5.1.1.1 – Identifying the maximum in the Magistrates’ Court",
+    "pages": [
+     112,
+     113
+    ],
+    "fns": [
+     835
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "15A",
+    "q": "A Drug and Alcohol Treatment Order (‘DATO’) can only be made by the Drug Court Division of the Magistrates’ Court or County Court.",
+    "via": "order.dato",
+    "path": "Part C – Sanctions > 15A – Drug and Alcohol Treatment Orders",
+    "pages": [
+     335,
+     335
+    ],
+    "fns": [
+     2731,
+     2732
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "8.7",
+    "q": "An adult offender who is convicted of a ‘serious offence’ by the Supreme or County Courts may be sentenced to an indefinite term of imprisonment, regardless of any maximum penalty set for that offence.",
+    "via": "indefinite.requirements",
+    "path": "Part C – Sanctions > 8 – Imprisonment > 8.7 – Indefinite sentence",
+    "pages": [
+     233,
+     237
+    ],
+    "fns": [
+     1900,
+     1901
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "10.1.2.1",
+    "q": "In the case of CNK v The Queen the 15-year old applicant was sentenced in the Supreme Court because he had been charged with attempted murder. Following his acquittal on that charge but on his conviction for other offences that had been uplifted, the Court of Appeal held that it was necessary to sentence the applicant on the remaining uplifted charges as if exclusively governed by the CYFA.",
+    "via": "youth.children_in_adult_courts",
+    "path": "Part C – Sanctions > 10 – Youth and youth detention > 10.1 – Legislative regime > 10.1.2 – Sentencing children in adult courts > 10.1.2.1 – Interaction with sentencing principles and purposes",
+    "pages": [
+     266,
+     267
+    ],
+    "fns": [
+     2141
+    ],
+    "authorities": [
+     "C0600"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.charges",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "framework"
+  ],
+  "field": "charges[]",
+  "type": "list: offence (offence register id), Victorian/Commonwealth, summary or indictable (and whether heard summarily; Criminal Procedure Act 2009 Schedule 2 if known), form (single, representative, rolled-up, course of conduct), same_time_group (which charges were committed at the same time: the Magistrates’ Court five-year cap), inchoate form (attempt, conspiracy, incitement) and the primary or intended offence, indictment number; for possible CCE offences: Schedule 1A class and the value of each transaction; for historic offending, the provision charged (e.g. Crimes Act s 45(2A), s 47A, s 44 for the historic Category 1 sexual provisions); arising_from_driving (yes / no / unknown — needed for s 24 negligently causing serious injury and other driving-linked items); charges[].classes, each yes / no / unknown (unknown → caution in the relevant gate, except as stated): arson offence (combination exception), “excluded offence” (combination), schedule 1 sexual offence (DATO; flag.dato_sexual_offence_scope — yes → error; for a 24.1.1, 24.1.2 or 24.1.4 offence no DATO is proposed unless the answer is no (app policy), and no or unknown → caution; for a 24.1.3 or 24.1.5 offence, unknown → caution), covered by Sentencing Act ss 10–10AE (DATO; the mm_group of the register row), AEO “relevant offence”, LCRA “specified offence”, Confiscation Act Schedule 1 / Schedule 2, RTO-eligible offence (flag.rto_serious_offence_list), forensic sample offence, serious motor vehicle offence",
+  "title": "Each charge and its form",
+  "statement": "A sentence must be imposed for each offence; the maximum and any scheme (category, standard sentence, mandatory minimum) follow the offence; representative and rolled-up charges have special rules; summary jurisdiction and the two-year summary cap turn on the class of offence; an inchoate offence is not a standard sentence offence and a relative maximum needs the primary offence; the CCE scheme turns on Schedule 1A and transaction values; federal charges are outside scope. Several gates turn on per-charge classes that the register does not carry and the Manual lists only for some offence chapters (e.g. 27.5.1, 28.7; a schedule 1 sexual offence for a DATO; a Schedule 1 offence for forfeiture); otherwise, without a stated class the gate must caution, not decide silently from the offence name (for a DATO on a 24.1.1, 24.1.2 or 24.1.4 offence the app also does not propose one unless the user states it is not a schedule 1 sexual offence: flag.dato_sexual_offence_scope). Historic provisions not in the register (e.g. ss 45(2A), 47A) carry Category 1 status, for an offender 18 or older, for offending from 20 March to 30 June 2017 (cat1.historic_sexual_provisions).",
+  "needed_for": [
+   "imp.sentence_each_offence",
+   "charges.representative",
+   "charges.rolled_up",
+   "charges.course_of_conduct",
+   "scope.federal_offences",
+   "formulation.multiple_indictments",
+   "mc.indictable_triable_summarily",
+   "mc.summary_offence_two_years",
+   "sso.scope",
+   "cce.regime",
+   "audit.maximum_applicable",
+   "cat1.historic_sexual_provisions",
+   "order.dato",
+   "anc.confiscation.available_orders",
+   "cco.combination_one_year",
+   "cco.combination_excluded_offences",
+   "anc.alcohol_exclusion_order",
+   "anc.exclusion_order_lcra",
+   "order.rto",
+   "anc.forensic_sample.nature_and_offences",
+   "licence.serious_mv_offences",
+   "guide.injury.ncsi_driving_gravity",
+   "cum.magistrates_5_years",
+   "audit.magistrates_court_limits"
+  ],
+  "related": [
+   "cat1.historic_sexual_provisions",
+   "flag.dato_sexual_offence_scope",
+   "flag.rto_serious_offence_list"
+  ],
+  "refs": [
+   {
+    "s": "8.2",
+    "q": "A court must impose a sentence for each offence.",
+    "via": "imp.sentence_each_offence",
+    "path": "Part C – Sanctions > 8 – Imprisonment > 8.2 – Individual and head sentences",
+    "pages": [
+     217,
+     218
+    ],
+    "fns": [
+     1744
+    ],
+    "authorities": []
+   },
+   {
+    "s": "2.4.4",
+    "q": "A representative charge does not increase the maximum sentence, nor does it permit a disproportionate sentence to be imposed. But all other things being equal, a representative charge will generally result in a heavier sentence than a charge relating to an isolated incident.",
+    "via": "charges.representative",
+    "path": "Part A – Method and Process > 2 – Method and process > 2.4 – Imposition of sentence > 2.4.4 – Representative charges",
+    "pages": [
+     51,
+     52
+    ],
+    "fns": [
+     278
+    ],
+    "authorities": [
+     "C0188",
+     "C0189",
+     "C0184",
+     "C0190"
+    ]
+   },
+   {
+    "s": "2.4.5",
+    "q": "The maximum penalty is therefore limited to the maximum for a single charge.",
+    "via": "charges.rolled_up",
+    "path": "Part A – Method and Process > 2 – Method and process > 2.4 – Imposition of sentence > 2.4.5 – Rolled-up charges",
+    "pages": [
+     52,
+     53
+    ],
+    "fns": [
+     294
+    ],
+    "authorities": [
+     "C0199"
+    ]
+   },
+   {
+    "s": "2.4.3.1",
+    "q": "A court must take care to ensure that separate sentences are imposed for the different charges.",
+    "via": "scope.federal_offences",
+    "path": "Part A – Method and Process > 2 – Method and process > 2.4 – Imposition of sentence > 2.4.3 – Formulation > 2.4.3.1 – Mixed indictments",
+    "pages": [
+     50,
+     50
+    ],
+    "fns": [],
+    "authorities": []
+   },
+   {
+    "s": "15A.3",
+    "q": "A DATO cannot be made where: • the offence: • is a schedule 1 sexual offence • involves the infliction of actual bodily harm • is covered by ss 10, 10AA, 10AB, 10AC, 10AD or 10AE of the Act • the offender is subject to parole, or • the offender is subject to a sentence of a higher court.",
+    "via": "order.dato",
+    "path": "Part C – Sanctions > 15A – Drug and Alcohol Treatment Orders > 15A.3 – Eligibility and limits",
+    "pages": [
+     347,
+     348
+    ],
+    "fns": [
+     2833,
+     2834,
+     2835,
+     2836,
+     2837
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "17.1.1",
+    "q": "Firstly, if an offender is convicted of a Schedule 1 offence (which includes a Schedule 2 offence) a court may, on application, make a forfeiture order for ‘tainted property’ or it may defer sentencing until after determining the forfeiture application.",
+    "path": "Part D – Ancillary Proceedings and Orders > 17 – Confiscation > 17.1 – Statutory regime > 17.1.1 – Available orders",
+    "pages": [
+     359,
+     360
+    ],
+    "fns": [
+     2946,
+     2947
+    ],
+    "authorities": [
+     "L0014",
+     "C1603"
+    ]
+   },
+   {
+    "s": "24.1.6.2",
+    "q": "Sexual penetration of a child under the age of 12 ss 45(2)(a), 45(2A) Level 2 imprisonment (25 years)# 17 March 2010 – 30 June 2017",
+    "via": "cat1.historic_sexual_provisions",
+    "path": "Part E – Specific offences > 24 – Sexual Offences > 24.1 – Penalties and current sentencing practice > 24.1.6 – Historic penalties > 24.1.6.2 – Sexual offences against or involving children (5 August 1991 – 30 June 2017)",
+    "pages": [
+     446,
+     451
+    ],
+    "fns": [
+     3558
+    ],
+    "authorities": [
+     "L0009"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.offence_dates",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "framework",
+   "comparables"
+  ],
+  "field": "charges[].offence_dates",
+  "type": "date or date range per charge",
+  "title": "Date(s) of offending",
+  "statement": "The maximum (and category, standard sentence and mandatory minimum schemes) depend on the date of offending; increases after the offence do not apply; historic offences engage historic practices and tables.",
+  "needed_for": [
+   "maximum.alterations",
+   "csp.historic_offences",
+   "sso.scope",
+   "flag.historic_tables_unstructured",
+   "cat1.custodial_required"
+  ],
+  "refs": [
+   {
+    "s": "5.1.3",
+    "q": "For offences occurring before the date of a change of penalty, the court must sentence in accordance with any reduction in maximum penalty but must not consider any increase in maximum penalty.",
+    "via": "maximum.alterations",
+    "path": "Part B – Principles, Purposes and Considerations > 5 – Circumstances and gravity of the offence > 5.1 – Maximum penalty > 5.1.3 – Effects of alterations to maximum penalty",
+    "pages": [
+     116,
+     116
+    ],
+    "fns": [
+     863
+    ],
+    "authorities": [
+     "L0002",
+     "L0003"
+    ]
+   },
+   {
+    "s": "5.2.9.2.1",
+    "q": "However, use of current sentencing practices must then take place alongside an awareness of the maximum penalty that applied at the time of the offending.",
+    "via": "csp.historic_offences",
+    "path": "Part B – Principles, Purposes and Considerations > 5 – Circumstances and gravity of the offence > 5.2 – Statutory factors > 5.2.9 – Current sentencing practices > 5.2.9.2 – Changes to current sentencing practices > 5.2.9.2.1 – Sentencing practices for historic offences",
+    "pages": [
+     137,
+     138
+    ],
+    "fns": [
+     1040
+    ],
+    "authorities": [
+     "C0892",
+     "C0893"
+    ]
+   },
+   {
+    "s": "9.2",
+    "q": "The standard sentence scheme became effective on 1 February 2018. The scheme only applies to offences committed after that date. It does not apply to offences committed by offenders under the age of 18 at the time of the offending, or to offences heard and determined summarily.",
+    "via": "sso.scope",
+    "path": "Part C – Sanctions > 9 – Statutory Schemes > 9.2 – Standard sentence scheme",
+    "pages": [
+     249,
+     252
+    ],
+    "fns": [
+     2016
+    ],
+    "authorities": [
+     "L0002",
+     "C0016"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.plea",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "offender"
+  ],
+  "field": "charges[].plea; plea_timing; sentence_indication",
+  "type": "guilty | not guilty (found guilty); stage first reasonably open to plead; when the plea or intention was indicated; whether withheld pending withdrawal of other charges; sentence_indication: given (yes / no), court, indicated type (and, in a higher court, maximum total effective sentence), whether the plea was entered on it, whether the sentencing judicial officer is the one who gave it",
+  "title": "Plea and its timing; sentence indication",
+  "statement": "The court must consider whether and when the offender pleaded guilty; timing affects the discount; a plea that produces a less severe sentence of a listed form (custodial; imprisonment; CCO of two years or more; fine over 10 penalty units; aggregate fine over 20 penalty units) requires the s 6AAA statement; a not guilty plea is never aggravating; a guilty plea to at least one imprisonable offence is a DATO condition; a sentence indication on which the plea was entered binds the judicial officer who gave it.",
+  "needed_for": [
+   "plea.benefits",
+   "plea.timing",
+   "plea.utilitarian_value",
+   "s6aaa.statement_required",
+   "plea.not_guilty_never_aggravating",
+   "indication.schemes",
+   "order.dato",
+   "audit.sentence_indication",
+   "audit.s6aaa_statement"
+  ],
+  "refs": [
+   {
+    "s": "7.1.1",
+    "q": "The Sentencing Act 1991 (Vic) (‘the Act’) requires a court to consider whether the offender pleaded guilty and at what stage in the proceedings any plea or intention to plead occurred.",
+    "via": "plea.benefits",
+    "path": "Part B – Principles, Purposes and Considerations > 7 – Policy considerations > 7.1 – Guilty plea > 7.1.1 – Benefits",
+    "pages": [
+     173,
+     174
+    ],
+    "fns": [
+     1371
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "7.1.2.3",
+    "q": "A late plea attracts a discount, but it will generally be of lower value. How the timing of a guilty plea is characterised depends on the facts of the case and involves establishing the time it could first be said it was reasonably open to the offender to plead guilty.",
+    "via": "plea.timing",
+    "path": "Part B – Principles, Purposes and Considerations > 7 – Policy considerations > 7.1 – Guilty plea > 7.1.2 – Weight > 7.1.2.3 – Timing",
+    "pages": [
+     176,
+     177
+    ],
+    "fns": [
+     1406
+    ],
+    "authorities": [
+     "C1116",
+     "C1125"
+    ]
+   },
+   {
+    "s": "7.1.4",
+    "q": "The notional sentence only needs to be stated if the court has imposed a less severe sentence because of the guilty plea.",
+    "path": "Part B – Principles, Purposes and Considerations > 7 – Policy considerations > 7.1 – Guilty plea > 7.1.4 – Section 6AAA notional sentence",
+    "pages": [
+     178,
+     179
+    ],
+    "fns": [
+     1429
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "15A.3",
+    "q": "• they plead guilty to at least one offence punishable by imprisonment within the jurisdiction of the Drug Court",
+    "via": "order.dato",
+    "path": "Part C – Sanctions > 15A – Drug and Alcohol Treatment Orders > 15A.3 – Eligibility and limits",
+    "pages": [
+     347,
+     348
+    ],
+    "fns": [
+     2826
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "7.2.2",
+    "q": "A sentence indication only binds the judge who gives the indication. It does not bind the court on any hearing before a different judge.",
+    "via": "indication.schemes",
+    "path": "Part B – Principles, Purposes and Considerations > 7 – Policy considerations > 7.2 – Sentence indication > 7.2.2 – Higher courts",
+    "pages": [
+     185,
+     185
+    ],
+    "fns": [
+     1481
+    ],
+    "authorities": [
+     "L0004"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.offender_age",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "offender",
+   "framework"
+  ],
+  "field": "offender.date_of_birth (preferred); offender.age_at_offence; offender.age_at_sentence",
+  "type": "date of birth, or years plus “turned 16 / 18 / 21 during the offence period or before sentence: yes / no / unknown” (an offending period can straddle a threshold birthday: 18 for Category 1/2 and standard sentences; 16–17 at the offence; 21 at sentence for youth detention)",
+  "title": "Offender’s age at the offence and at sentence",
+  "statement": "Age decides youth detention eligibility, whether Category 1/2 and standard sentence schemes apply, the regard to adult minimums for 16–17 year olds, the weight of general deterrence and rehabilitation, and advanced-age considerations; several mandatory minimums do not apply to an offender under 18 at the offence.",
+  "needed_for": [
+   "yjc.age",
+   "youth.minimum_npp_regard",
+   "sso.scope",
+   "purpose.general_deterrence",
+   "factor.advanced_age",
+   "mmnpp.protected_officials",
+   "cat1.custodial_required",
+   "cat2.custodial_unless",
+   "mmnpp.manslaughter_10y",
+   "mmnpp.gross_violence_4y",
+   "serious_offender.regime",
+   "indefinite.requirements",
+   "mmnpp.aggravated_home_invasion_carjacking_3y",
+   "order.youth.scope_and_jurisdiction",
+   "order.youth_detention",
+   "yjc.serious_youth_offence",
+   "youth.children_in_adult_courts",
+   "cco.youth",
+   "audit.youth_principles",
+   "flag.general_deterrence_childrens_court_charges"
+  ],
+  "refs": [
+   {
+    "s": "10.1.1.2",
+    "q": "Because the Sentencing Act 1991 (Vic) (‘the Act’) defines a ‘young offender’ as someone who is under the age of 21 at the time of sentencing, this effectively means that a YJC order can only be made for offenders who are between 15 and 21 at the time of sentencing, and a YRC order can only be made for an offender who is under 15 at that time.",
+    "via": "yjc.age",
+    "path": "Part C – Sanctions > 10 – Youth and youth detention > 10.1 – Legislative regime > 10.1.1 – Youth detention orders > 10.1.1.2 – Prerequisites and limits",
+    "pages": [
+     260,
+     261
+    ],
+    "fns": [
+     2099
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "10.1.2",
+    "q": "Lastly, Parliament requires the higher courts in sentencing an offender aged 16 years or more but under 18 years at the time of the commission of an indictable offence, to ‘have regard to any requirement in [the] Act that a specified minimum non-parole period…be fixed or a specified minimum term of imprisonment be imposed, had that offence been committed by an adult’.",
+    "via": "youth.minimum_npp_regard",
+    "path": "Part C – Sanctions > 10 – Youth and youth detention > 10.1 – Legislative regime > 10.1.2 – Sentencing children in adult courts",
+    "pages": [
+     264,
+     265
+    ],
+    "fns": [
+     2138
+    ],
+    "authorities": [
+     "L0002",
+     "L0007"
+    ]
+   },
+   {
+    "s": "4.2.1",
+    "q": "General deterrence has minimal relevance when sentencing a child.",
+    "via": "purpose.general_deterrence",
+    "path": "Part B – Principles, Purposes and Considerations > 4 – Sentencing purposes > 4.2 – Deterrence > 4.2.1 – General deterrence",
+    "pages": [
+     94,
+     99
+    ],
+    "fns": [],
+    "authorities": []
+   },
+   {
+    "s": "6.1.1",
+    "q": "A significant delay between offending and sentencing can also be relevant, because it means the offender is older than they would have been if sentenced closer to the offending, and it is the offender’s age at the time of sentencing that is relevant.",
+    "via": "factor.advanced_age",
+    "path": "Part B – Principles, Purposes and Considerations > 6 – Circumstances of the offender > 6.1 – Innate characteristics > 6.1.1 – Age",
+    "pages": [
+     143,
+     144
+    ],
+    "fns": [
+     1091
+    ],
+    "authorities": [
+     "C0921"
+    ]
+   },
+   {
+    "s": "9.1.2.5",
+    "q": "This statutory minimum does not apply if: • the offender was under 18 at the time of the offence;",
+    "path": "Part C – Sanctions > 9 – Statutory Schemes > 9.1 – Mandatory imprisonment schemes > 9.1.2 – Mandatory minimum sentences > 9.1.2.5 – Aggravated home invasion or carjacking – three-year minimum non-parole period",
+    "pages": [
+     246,
+     247
+    ],
+    "fns": [
+     1994
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.offender_type",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "framework"
+  ],
+  "field": "offender.natural_person",
+  "type": "natural person | body corporate",
+  "title": "Natural person or body corporate",
+  "statement": "Fine maxima differ for a body corporate (five times the natural-person maximum, stated for Crimes Act offences in 5.1.1 and generally in 12.2: flag.body_corporate_fine_multiplier; 2500 penalty units summarily) and directors may be made liable; for a Level 2 offence a fine may be imposed on a body corporate as an alternative to imprisonment (12.1).",
+  "needed_for": [
+   "fine.maximum",
+   "mc.fine_limits",
+   "order.fine.directors_liability",
+   "order.fine",
+   "audit.fine_rules",
+   "flag.body_corporate_fine_multiplier"
+  ],
+  "related": [
+   "flag.body_corporate_fine_multiplier"
+  ],
+  "refs": [
+   {
+    "s": "12.2",
+    "q": "The maximum fine that may be imposed on a body corporate is five times the maximum fine that could be imposed on a natural person for the same offence. Where a matter involving a body corporate is heard summarily the maximum fine that can be imposed is 2500 penalty units.",
+    "via": "fine.maximum",
+    "path": "Part C – Sanctions > 12 – Fines > 12.2 – Maximum fine",
+    "pages": [
+     302,
+     302
+    ],
+    "fns": [
+     2447,
+     2448
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "12.1",
+    "q": "It cannot be imposed as an alternative, unless otherwise stated or if the offender is a body corporate.",
+    "path": "Part C – Sanctions > 12 – Fines > 12.1 – Overview",
+    "pages": [
+     301,
+     301
+    ],
+    "fns": [
+     2440
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "12.1",
+    "q": "For Level 2 offences (punishable by 25 years’ imprisonment), a fine can only be imposed in addition to imprisonment.",
+    "path": "Part C – Sanctions > 12 – Fines > 12.1 – Overview",
+    "pages": [
+     301,
+     301
+    ],
+    "fns": [],
+    "authorities": []
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.criminal_history",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "offender"
+  ],
+  "field": "offender.priors[]; offender.subsequent_convictions[]; offender.serious_offender; offender.cce_findings[]",
+  "type": "list with dates, offences, jurisdiction (Victorian / Commonwealth / interstate / overseas), whether a conviction was recorded, whether imprisonment or youth justice centre detention resulted, offence class (arson, drug, sexual, violent, serious violent), and for CCE: findings of guilt for CCE offences with dates and values; prior Category A or B serious youth offence convictions; any previous alcohol exclusion order for the current offence; prior specified offences or exclusion orders in a designated area (LCRA); prior unlicensed or disqualified driving; any previous RSA s 61(3) offence",
+  "title": "Prior and subsequent convictions; serious offender and CCE status; pending charges",
+  "statement": "Priors are relevant to several purposes (not to aggravate); some statutes turn on them: serious offender status needs qualifying convictions that resulted in imprisonment or youth detention, proved beyond reasonable doubt; CCE offender status needs findings of guilt for CCE offences within 10 years; pending charges may justify deferral or being taken into account. A dismissal has the same effect as a conviction for proceedings for a subsequent offence; a prior Category A or B conviction engages the exceptional-circumstances requirement for youth detention where the current charge is a Category B serious youth offence (a Category A charge engages it without any prior); prior unlicensed or disqualified driving may justify a longer disqualification; a previous s 61(3) offence doubles the mandatory disqualification.",
+  "needed_for": [
+   "factor.prior_and_subsequent_convictions",
+   "findings.criminal_record",
+   "serious_offender.regime",
+   "purpose.specific_deterrence",
+   "agg.prohibited",
+   "cce.regime",
+   "order.dismissal",
+   "anc.exclusion_order_lcra",
+   "yjc.serious_youth_offence",
+   "anc.alcohol_exclusion_order",
+   "order.licence_disqualification",
+   "audit.mandatory_ancillary_orders"
+  ],
+  "refs": [
+   {
+    "s": "2.3.2.2.1",
+    "q": "Previous convictions are relevant to several of the sentencing purposes, and under some statutory provisions may affect the character or quantum of the punishment open to the court.",
+    "via": "findings.criminal_record",
+    "path": "Part A – Method and Process > 2 – Method and process > 2.3 – Findings > 2.3.2 – Evidence > 2.3.2.2 – Records, depositions, reports, and statements > 2.3.2.2.1 – Criminal record and subsequent offending",
+    "pages": [
+     38,
+     39
+    ],
+    "fns": [
+     153
+    ],
+    "authorities": [
+     "L0006"
+    ]
+   },
+   {
+    "s": "6.3.1.2",
+    "q": "Evidence of an offender’s bad character, i.e., their prior criminality, is also relevant to a court in exercising the sentencing discretion, but it cannot be used in aggravation to increase a sentence or to doubly punish an offender. Instead, it may indicate an offender’s moral culpability, persistent lawlessness or a propensity to commit particular crimes and so inhibit consideration of mitigatory factors such as rehabilitation.",
+    "via": "factor.prior_and_subsequent_convictions",
+    "path": "Part B – Principles, Purposes and Considerations > 6 – Circumstances of the offender > 6.3 – Actions and behaviour > 6.3.1 – Character > 6.3.1.2 – Bad character",
+    "pages": [
+     163,
+     163
+    ],
+    "fns": [
+     1277,
+     1278,
+     1279,
+     1280
+    ],
+    "authorities": [
+     "C1043",
+     "C0244",
+     "C0224",
+     "C1044",
+     "C1045",
+     "C1046",
+     "C1047"
+    ]
+   },
+   {
+    "s": "9.3",
+    "q": "Firstly, if the Supreme or County Court sentences a ‘serious offender’ to imprisonment for a ‘relevant offence’, it must regard protection of the community as the principal sentencing purpose.",
+    "via": "serious_offender.regime",
+    "path": "Part C – Sanctions > 9 – Statutory Schemes > 9.3 – Serious offenders",
+    "pages": [
+     252,
+     255
+    ],
+    "fns": [],
+    "authorities": []
+   },
+   {
+    "s": "2.3.2.2.1",
+    "q": "The court should be advised of any pending charges so it may consider deferring sentence until those charges are dealt with",
+    "via": "findings.criminal_record",
+    "path": "Part A – Method and Process > 2 – Method and process > 2.3 – Findings > 2.3.2 – Evidence > 2.3.2.2 – Records, depositions, reports, and statements > 2.3.2.2.1 – Criminal record and subsequent offending",
+    "pages": [
+     38,
+     39
+    ],
+    "fns": [
+     161,
+     162
+    ],
+    "authorities": [
+     "C0143"
+    ]
+   },
+   {
+    "s": "9.3",
+    "q": "Moreover, each of the convictions must have resulted in the offender being imprisoned or detained in a youth justice centre.",
+    "via": "serious_offender.regime",
+    "path": "Part C – Sanctions > 9 – Statutory Schemes > 9.3 – Serious offenders",
+    "pages": [
+     252,
+     255
+    ],
+    "fns": [
+     2057
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "9.3",
+    "q": "The court must be satisfied beyond reasonable doubt that a conviction was indeed a conviction for a relevant offence. In considering a conviction against a law of the Commonwealth or recorded in an interstate or international jurisdiction, the court must be satisfied that the offence is substantially similar to an arson, drug, serious violent, sexual, or violent offence (as the case requires) and that the offender was sentenced to a term of imprisonment or detention for that offence.",
+    "via": "serious_offender.regime",
+    "path": "Part C – Sanctions > 9 – Statutory Schemes > 9.3 – Serious offenders",
+    "pages": [
+     252,
+     255
+    ],
+    "fns": [
+     2060,
+     2061
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "9.4",
+    "q": "A ‘relevant offence’ means a CCE offence the offender has been found guilty of within 10 years before the date of their latest offence,",
+    "via": "cce.regime",
+    "path": "Part C – Sanctions > 9 – Statutory Schemes > 9.4 – Continuing criminal enterprise offenders",
+    "pages": [
+     255,
+     257
+    ],
+    "fns": [
+     2078,
+     2079
+    ],
+    "authorities": [
+     "L0002",
+     "C1199",
+     "C1055"
+    ]
+   },
+   {
+    "s": "13.1",
+    "q": "However, the Act provides it has the same effect as if a conviction had been recorded for: • appeals against sentence; • proceedings for variation or breach of sentence; • proceedings against the offender for a subsequent offence;",
+    "path": "Part C – Sanctions > 13 – Dismissals, discharges, and adjournments > 13.1 – Dismissals",
+    "pages": [
+     314,
+     315
+    ],
+    "fns": [],
+    "authorities": []
+   },
+   {
+    "s": "10.1.1.2",
+    "q": "Before making a detention order for a young offender charged with a Category A Serious Youth Offence, or with a Category B Serious Youth Offence where they have also previously been convicted of a Category A or B Serious Youth Offence, a court must be satisfied that exceptional circumstances exist.",
+    "via": "yjc.serious_youth_offence",
+    "path": "Part C – Sanctions > 10 – Youth and youth detention > 10.1 – Legislative regime > 10.1.1 – Youth detention orders > 10.1.1.2 – Prerequisites and limits",
+    "pages": [
+     260,
+     261
+    ],
+    "fns": [
+     2100
+    ],
+    "authorities": [
+     "L0002",
+     "C1441"
+    ]
+   },
+   {
+    "s": "16.5",
+    "q": "However, where no legitimate need for a driver licence is demonstrated, or where the offender’s prior criminal history involved unlicensed or disqualified driving, a longer period of disqualification may be justified.",
+    "path": "Part C – Sanctions > 16 – Licence disqualification > 16.5 – Determining period of disqualification",
+    "pages": [
+     356,
+     358
+    ],
+    "fns": [
+     2936
+    ],
+    "authorities": [
+     "C1594"
+    ]
+   },
+   {
+    "s": "20.1.2",
+    "q": "• whether the offender has previously been found guilty of a specified offence committed in the designated area;",
+    "path": "Part D – Ancillary Proceedings and Orders > 20 – Other ancillary orders > 20.1 – Alcohol related orders > 20.1.2 – Exclusion orders",
+    "pages": [
+     394,
+     396
+    ],
+    "fns": [],
+    "authorities": []
+   },
+   {
+    "s": "23.1.1",
+    "q": "1st offence - license cancellation and dis-qualification for at least 4 years if conviction recorded, 2 years otherwise Subsequent offence - licence cancellation and dis-qualification for at least 8 years if conviction recorded, at least 4 years otherwise",
+    "via": "intake.driving",
+    "path": "Part E – Specific offences > 23 – Indictable driving offences > 23.1 – Penalties and current sentencing practice > 23.1.1 – Penalties",
+    "pages": [
+     422,
+     424
+    ],
+    "fns": [],
+    "authorities": []
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.status_at_offence",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "facts",
+   "synthesis"
+  ],
+  "field": "offender.status_at_offence; charges[].committed_on_parole; offender.parole_cancelled_before_sentence; offender.uncompleted_sentences[]; offender.serving_or_sentenced_to_life; offender.orders_in_force_at_sentence[]",
+  "type": "status at offence: on parole (from a life sentence?) | on bail | in custody / escape | subject to a CCO or other order | subject to a supervision order | none; per charge: committed on parole (yes / no) — aggregation cannot mix parole and non-parole offending; if on parole: has the parole been cancelled before sentencing (yes / no / unknown); sentences being served at sentencing: Victorian or Commonwealth, head sentence, non-parole period and its end date, whether the offender is still within the non-parole period, whether it was a straight sentence, any pre-sentence detention declared on it; Commonwealth: end of the non-parole or pre-release period; already sentenced to or serving life (yes / no); orders in force at sentencing: CCO (remaining term and unpaid work hours), youth detention being served (whole term imposed and unexpired part, in months: yjc.maximum, flag.youth_detention_cap_across_occasions), DATO, parole, a sentence of a higher court, alcohol exclusion order, licence suspension (including Road Safety Act Part 6B), intervention or child protection orders affecting the offender",
+  "title": "Status at the time of offending and sentences being served",
+  "statement": "Offending on parole or bail, prison offences and escape engage presumptions of cumulation; offending on conditional liberty or contrary to orders may aggravate; totality applies to sentences being served. An offender serving the non-parole period of a prior sentence needs a new single non-parole period (with the allowance for the parole sentence served and no double-counted pre-sentence detention); no term may be cumulated on a life sentence imposed, being served or paroled from; an offender serving a Commonwealth sentence needs a commencement direction within the s 16(4) limit. Orders in force at sentencing limit what can be imposed: the CCO maximum term and total hours, youth detention maxima across occasions, one DATO at a time and no DATO for an offender on parole or subject to a higher-court sentence, a previous AEO for the offence, concurrency of licence orders; CCO conditions must fit any intervention orders.",
+  "needed_for": [
+   "cum.presumption_cumulation",
+   "factor.uncharged_conduct",
+   "principle.totality",
+   "principle.totality_statutory_limits",
+   "npp.new_single_npp",
+   "psd.new_single_npp",
+   "cum.life_parole",
+   "cum.commonwealth_sentence_commencement",
+   "mm.supervision_order_12m",
+   "cco.maximum_term",
+   "yjc.maximum",
+   "order.dato",
+   "anc.alcohol_exclusion_order",
+   "order.licence.concurrency_and_rsa",
+   "agg.prohibited",
+   "order.cco.condition_residence_place",
+   "audit.cumulation_exceptional_circumstances",
+   "audit.sentence_each_charge_and_formulation"
+  ],
+  "related": [
+   "flag.youth_detention_cap_across_occasions",
+   "flag.parole_not_cancelled_at_sentence",
+   "flag.cth_sentence_commencement_fixed_or_latest"
+  ],
+  "refs": [
+   {
+    "s": "8.4.1",
+    "q": "For terms of imprisonment for the following offences, the default rule is cumulation rather than concurrency: • defaulting on a fine or payment of money, but only for uncompleted terms relating to a similar default; • a prison offence or escape; • a serious offender convicted of a relevant offence; • an offence committed while released on parole or for breaching parole; • an offence committed while released on bail;",
+    "via": "cum.presumption_cumulation",
+    "path": "Part C – Sanctions > 8 – Imprisonment > 8.4 – Cumulation and concurrency > 8.4.1 – Victorian regime",
+    "pages": [
+     224,
+     227
+    ],
+    "fns": [
+     1818,
+     1819,
+     1820,
+     1821,
+     1822,
+     1823
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "5.2.8.5",
+    "q": "offending while released on some form of conditional liberty or in contravention of specific court orders.",
+    "path": "Part B – Principles, Purposes and Considerations > 5 – Circumstances and gravity of the offence > 5.2 – Statutory factors > 5.2.8 – Aggravating, mitigating, and other relevant circumstances > 5.2.8.5 – Uncharged conduct and surrounding facts",
+    "pages": [
+     130,
+     131
+    ],
+    "fns": [
+     1007
+    ],
+    "authorities": [
+     "C0215",
+     "C0877",
+     "C0878",
+     "C0666",
+     "C0306"
+    ]
+   },
+   {
+    "s": "8.3.3.3",
+    "q": "If the court intends to sentence the offender to a further term of imprisonment (‘new sentence’), it must fix a new single non-parole period for all sentences the offender is to serve or complete.",
+    "via": "npp.new_single_npp",
+    "path": "Part C – Sanctions > 8 – Imprisonment > 8.3 – Non-parole period > 8.3.3 – Special considerations > 8.3.3.3 – Prior sentences",
+    "pages": [
+     221,
+     222
+    ],
+    "fns": [
+     1788
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "8.4.1",
+    "q": "Where an offender is paroled from a life sentence, a further sentence cannot be cumulated upon that life term.",
+    "via": "cum.life_parole",
+    "path": "Part C – Sanctions > 8 – Imprisonment > 8.4 – Cumulation and concurrency > 8.4.1 – Victorian regime",
+    "pages": [
+     224,
+     227
+    ],
+    "fns": [
+     1834
+    ],
+    "authorities": [
+     "C1370",
+     "C1371",
+     "C1372"
+    ]
+   },
+   {
+    "s": "8.4.1",
+    "q": "If an offender is already serving a sentence for a Commonwealth offence the court must direct when the new term commences. This must be no later than immediately after completion of the Commonwealth sentence, if no non-parole period or pre-release period was fixed, or immediately after the end of any non-parole or pre-release period fixed as part of the Commonwealth sentence.",
+    "via": "cum.commonwealth_sentence_commencement",
+    "path": "Part C – Sanctions > 8 – Imprisonment > 8.4 – Cumulation and concurrency > 8.4.1 – Victorian regime",
+    "pages": [
+     224,
+     227
+    ],
+    "fns": [
+     1837
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "3.3.3",
+    "q": "Note that unlike cases where parole has been cancelled prior to sentencing for the offences committed on parole, where parole has not been cancelled at the time of sentencing, the court may not make an order pursuant to s 16(3B) for cumulation or concurrency without breaching s 5(2AA).",
+    "via": "principle.totality_parole_detail",
+    "path": "Part B – Principles, Purposes and Considerations > 3 – Sentencing principles > 3.3 – Totality > 3.3.3 – Application to parole",
+    "pages": [
+     72,
+     74
+    ],
+    "fns": [
+     498
+    ],
+    "authorities": [
+     "C0304"
+    ]
+   },
+   {
+    "s": "8.5",
+    "q": "• if the offences include both an offence committed in violation of a parole order and an offence ‘committed at another time’.",
+    "path": "Part C – Sanctions > 8 – Imprisonment > 8.5 – Aggregate sentence",
+    "pages": [
+     228,
+     229
+    ],
+    "fns": [
+     1860
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "21.4.1",
+    "q": "Additional sentences of imprisonment cannot be imposed on persons already sentenced to, or serving a life sentence, other than concurrently with the life sentence.",
+    "via": "cum.life_parole",
+    "path": "Part E – Specific offences > 21 – Murder > 21.4 – Formulation of sentence > 21.4.1 – Life sentence with no parole period",
+    "pages": [
+     408,
+     409
+    ],
+    "fns": [
+     3371
+    ],
+    "authorities": [
+     "C1370",
+     "C1371",
+     "C1372"
+    ]
+   },
+   {
+    "s": "15A.3",
+    "q": "A DATO can be applied across multiple offences. However, an offender can only be subject to one DATO at any given time.",
+    "via": "order.dato",
+    "path": "Part C – Sanctions > 15A – Drug and Alcohol Treatment Orders > 15A.3 – Eligibility and limits",
+    "pages": [
+     347,
+     348
+    ],
+    "fns": [
+     2840,
+     2841
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "10.1.1.3",
+    "q": "If the offender is sentenced to youth detention while already undergoing a sentence of youth detention, cumulation orders only operate to the point when the maximum period is reached.",
+    "path": "Part C – Sanctions > 10 – Youth and youth detention > 10.1 – Legislative regime > 10.1.1 – Youth detention orders > 10.1.1.3 – Concurrency, cumulation, calculation, and commencement",
+    "pages": [
+     261,
+     262
+    ],
+    "fns": [
+     2113
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.presentence_detention",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "synthesis"
+  ],
+  "field": "pre_sentence_detention_days",
+  "type": "days in custody referable to the offences (from charge, or from first arrest where in continuous custody on a series of offences committed on different occasions); periods to exclude (under one day, already declared under another sentence, while serving another sentence, extradition for other offending, immigration detention pending trial); other custody for the Renzella discretion (residential rehabilitation, immigration detention, “dead time”)",
+  "title": "Time already served",
+  "statement": "Time served must be declared (the whole continuous custody from arrest where s 18(6) applies, excluding non-declarable periods); it is deducted from a combination sentence’s custodial part (affecting the one-year ceiling) and from youth detention unless otherwise ordered; undeclarable custody may be weighed under the Renzella discretion.",
+  "needed_for": [
+   "formulation.order_of_steps",
+   "order.cco.combination_time_served",
+   "yjc.aggregate_and_custody",
+   "psd.declare",
+   "psd.exclusions",
+   "psd.renzella",
+   "psd.new_single_npp",
+   "cco.combination_one_year",
+   "order.rto",
+   "order.dato"
+  ],
+  "refs": [
+   {
+    "s": "2.4.3",
+    "q": "The court must declare any period already served and have it noted in the records of the court.",
+    "via": "formulation.order_of_steps",
+    "path": "Part A – Method and Process > 2 – Method and process > 2.4 – Imposition of sentence > 2.4.3 – Formulation",
+    "pages": [
+     49,
+     50
+    ],
+    "fns": [
+     271
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "11.8.4",
+    "q": "The Act provides that any period of pre-sentence imprisonment must be deducted from any term of imprisonment imposed as part of a combination sentence unless the court otherwise orders.",
+    "via": "order.cco.combination_time_served",
+    "path": "Part C – Sanctions > 11 – Community correction order > 11.8 – Combining a CCO with a term of imprisonment > 11.8.4 – Application of time served",
+    "pages": [
+     297,
+     298
+    ],
+    "fns": [
+     2408
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "8.6.1",
+    "q": "If an offender is charged with a series of offences committed on different occasions and has been in continuous custody since their arrest, a sentencing court must take into account the whole of the custodial period from the time of their arrest even if they are not convicted of the offence underlying the first arrest or any other offence.",
+    "via": "psd.declare",
+    "path": "Part C – Sanctions > 8 – Imprisonment > 8.6 – Pre-sentence detention > 8.6.1 – Victorian regime",
+    "pages": [
+     229,
+     232
+    ],
+    "fns": [
+     1869
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "8.6.2",
+    "q": "Courts have an independent common law ‘Renzella discretion’ to consider an offender’s PSD which is not subject to a s 18 declaration.",
+    "via": "psd.renzella",
+    "path": "Part C – Sanctions > 8 – Imprisonment > 8.6 – Pre-sentence detention > 8.6.2 – Renzella discretion – common law pre-sentence detention declarations",
+    "pages": [
+     232,
+     233
+    ],
+    "fns": [
+     1889
+    ],
+    "authorities": [
+     "C1399",
+     "C1353",
+     "C1400",
+     "C1401"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.victim",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "gravity",
+   "framework"
+  ],
+  "field": "victims[]: status (emergency worker, custodial officer, youth justice custodial worker, police, protected worker on duty, including interstate or Commonwealth workers on duty in Victoria) and whether the offender knew or was reckless as to it (proof beyond reasonable doubt); whether a protected official was injured (driving offences); age; vulnerability; relationship to offender; family violence context; intervention order (and any FVIO, PSIO or child protection order affecting the offender, for CCO residence, place and curfew conditions); children present",
+  "type": "structured per victim",
+  "title": "Victim status, vulnerability and relationship",
+  "statement": "Victim status triggers mandatory minimums and Category 1 for some offences (only if the status and the offender’s knowledge or recklessness are proved beyond reasonable doubt); vulnerability and family violence context bear heavily on gravity; breach of a family violence intervention order or offending in front of children increases gravity.",
+  "needed_for": [
+   "mmnpp.protected_officials",
+   "mmnpp.driving_protected_2y",
+   "factor.vulnerable_victim",
+   "factor.family_violence",
+   "factor.relationship_domestic_stranger",
+   "flag.icsi_category_footnote",
+   "cat1.custodial_required",
+   "sso.list",
+   "order.mtmo",
+   "order.cco.condition_residence_place",
+   "flag.police_child_presumption"
+  ],
+  "refs": [
+   {
+    "s": "9.1.2.3",
+    "q": "a victim of the offence was an emergency worker on duty, a custodial officer on duty, or a youth justice custodial worker on duty (as the case may be); and",
+    "via": "mmnpp.protected_officials",
+    "path": "Part C – Sanctions > 9 – Statutory Schemes > 9.1 – Mandatory imprisonment schemes > 9.1.2 – Mandatory minimum sentences > 9.1.2.3 – Violence offences against protected officials – six-month to five-year minimum non-parole period",
+    "pages": [
+     243,
+     245
+    ],
+    "fns": [],
+    "authorities": []
+   },
+   {
+    "s": "5.2.6",
+    "q": "Offending against ‘vulnerable victims’ is considered to be particularly grave. These victims include:",
+    "via": "factor.vulnerable_victim",
+    "path": "Part B – Principles, Purposes and Considerations > 5 – Circumstances and gravity of the offence > 5.2 – Statutory factors > 5.2.6 – Impact on and circumstances of the victim",
+    "pages": [
+     122,
+     125
+    ],
+    "fns": [],
+    "authorities": []
+   },
+   {
+    "s": "5.2.8.3",
+    "q": "For these same reasons, the gravity of the offending will be increased if the offending breaches a family violence intervention order or is committed in front of children.",
+    "via": "factor.family_violence",
+    "path": "Part B – Principles, Purposes and Considerations > 5 – Circumstances and gravity of the offence > 5.2 – Statutory factors > 5.2.8 – Aggravating, mitigating, and other relevant circumstances > 5.2.8.3 – Family violence",
+    "pages": [
+     128,
+     129
+    ],
+    "fns": [
+     987
+    ],
+    "authorities": [
+     "C0550",
+     "C0861",
+     "C0860",
+     "C0862",
+     "C0863"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.harm_and_impact",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "gravity"
+  ],
+  "field": "harm; victim_impact_statement",
+  "type": "injuries, losses, psychological harm; actual bodily harm inflicted (none / minor / more than minor); whether a victim impact statement was made and its content; disputed harm",
+  "title": "Harm and victim impact",
+  "statement": "Harm resulting directly from the offence must be considered whether or not foreseeable; disputed harm used to increase the sentence must be proved beyond reasonable doubt. A DATO cannot be made where the offence involves the infliction of actual bodily harm (unless, in the Magistrates’ Drug Court, the harm was minor); compensation draws on the injury and loss facts.",
+  "needed_for": [
+   "factor.harm",
+   "findings.victim_impact",
+   "gravity.statutory_factors",
+   "order.dato",
+   "anc.compensation.personal_injury_threshold",
+   "anc.compensation.heads_and_causation"
+  ],
+  "refs": [
+   {
+    "s": "5.2.7",
+    "q": "The nature and degree of any harm suffered is highly relevant to determining the gravity of the offending and the forms and types of harms are extremely varied.",
+    "via": "factor.harm",
+    "path": "Part B – Principles, Purposes and Considerations > 5 – Circumstances and gravity of the offence > 5.2 – Statutory factors > 5.2.7 – Harm (direct injury, loss, or damage)",
+    "pages": [
+     125,
+     126
+    ],
+    "fns": [
+     952
+    ],
+    "authorities": [
+     "C0823"
+    ]
+   },
+   {
+    "s": "5.2.7",
+    "q": "The prosecution must demonstrate a temporal or other connection between the harm and the offending sufficient to show the one was the direct result of the other.",
+    "via": "factor.harm",
+    "path": "Part B – Principles, Purposes and Considerations > 5 – Circumstances and gravity of the offence > 5.2 – Statutory factors > 5.2.7 – Harm (direct injury, loss, or damage)",
+    "pages": [
+     125,
+     126
+    ],
+    "fns": [
+     955
+    ],
+    "authorities": [
+     "C0824"
+    ]
+   },
+   {
+    "s": "2.3.2.2.4",
+    "q": "If the court intends to impose a more severe sentence because of an alleged harm identified in a victim’s statement, and there is a dispute about the origin of the harm, then a causal connection between the harm and the offending will have to be established beyond reasonable doubt.",
+    "via": "findings.victim_impact",
+    "path": "Part A – Method and Process > 2 – Method and process > 2.3 – Findings > 2.3.2 – Evidence > 2.3.2.2 – Records, depositions, reports, and statements > 2.3.2.2.4 – Statements",
+    "pages": [
+     42,
+     46
+    ],
+    "fns": [
+     205
+    ],
+    "authorities": [
+     "C0035"
+    ]
+   },
+   {
+    "s": "15A.3",
+    "q": "A DATO cannot be made where: • the offence: • is a schedule 1 sexual offence • involves the infliction of actual bodily harm • is covered by ss 10, 10AA, 10AB, 10AC, 10AD or 10AE of the Act • the offender is subject to parole, or • the offender is subject to a sentence of a higher court.",
+    "via": "order.dato",
+    "path": "Part C – Sanctions > 15A – Drug and Alcohol Treatment Orders > 15A.3 – Eligibility and limits",
+    "pages": [
+     347,
+     348
+    ],
+    "fns": [
+     2833,
+     2834,
+     2835,
+     2836,
+     2837
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "fn": 2834,
+    "q": "Note however that s 18Z(5) allows the Magistrates’ Drug Court division to make a DATO where the offence involves the infliction of actual bodily harm if satisfied that the harm was of a minor nature.",
+    "via": "order.dato",
+    "section": "15A.3",
+    "page": 348,
+    "fns": [
+     2834
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.offence_circumstances",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "gravity",
+   "framework"
+  ],
+  "field": "circumstances: planning, duration, role (principal / directed, assisted or encouraged; minor involvement), in company, weapon (type and use), motive (incl. hatred or prejudice), benefit or loss, gross-violence and single-punch features (each manslaughter element), home invasion / carjacking aggravating features, statutory aggravating conditions in the offence register (trafficking at the direction of a criminal organisation; trafficking or supply within 500 metres of a school; face covering in affray or violent disorder), breach of trust, concealment, post-offence conduct; committed in a designated area (LCRA exclusion order); committed in or against a youth justice or residential centre (youth cumulation); whether the offence arose out of the driving of a motor vehicle",
+  "type": "structured facts with source (agreed / alleged / disputed)",
+  "title": "Circumstances of the offence",
+  "statement": "The statutory gravity factors and the offence-specific guidance require these facts; mandatory minimum schemes turn on gross violence or single punch features proved beyond reasonable doubt and on the offender’s role; some maxima are higher only if a statutory condition is established.",
+  "needed_for": [
+   "gravity.statutory_factors",
+   "factor.planning_scale",
+   "factor.role",
+   "factor.weapon",
+   "factor.hate_prejudice_motive",
+   "factor.benefit_and_loss",
+   "mmnpp.gross_violence_definition",
+   "factor.breach_of_trust_status",
+   "factor.uncharged_conduct",
+   "mmnpp.manslaughter_10y",
+   "mmnpp.gross_violence_4y",
+   "mmnpp.protected_officials",
+   "audit.maximum_applicable",
+   "anc.exclusion_order_lcra",
+   "licence.serious_mv_offences",
+   "cum.presumption_cumulation",
+   "audit.cumulation_exceptional_circumstances"
+  ],
+  "refs": [
+   {
+    "s": "5.2",
+    "q": "The Act prescribes a number of non-exclusive circumstances relevant to determining the gravity of offending, including: • its nature and gravity; • the offender’s culpability and degree of responsibility for the offence; • whether the offending was motivated, wholly or partly, by hatred or prejudice against a group of people with whom the victim was associated or the offender believed they were associated; • its impact on the victim; • the circumstances of the victim; • any injury, loss, or damage resulting directly from the offending; • any aggravating or mitigating circumstances of the offender; • ‘or of any other relevant circumstances’.",
+    "via": "gravity.statutory_factors",
+    "path": "Part B – Principles, Purposes and Considerations > 5 – Circumstances and gravity of the offence > 5.2 – Statutory factors",
+    "pages": [
+     116,
+     117
+    ],
+    "fns": [
+     867
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "5.2.8.1",
+    "q": "The use of a weapon is relevant to assessing the gravity of the offending. While there are few limits on what might be considered a ‘weapon’, the more dangerous the item and the greater its capacity to invoke fear, the greater the seriousness of the offending.",
+    "via": "factor.weapon",
+    "path": "Part B – Principles, Purposes and Considerations > 5 – Circumstances and gravity of the offence > 5.2 – Statutory factors > 5.2.8 – Aggravating, mitigating, and other relevant circumstances > 5.2.8.1 – Weapons",
+    "pages": [
+     126,
+     127
+    ],
+    "fns": [
+     962
+    ],
+    "authorities": [
+     "C0827",
+     "C0828",
+     "C0829",
+     "C0579"
+    ]
+   },
+   {
+    "s": "9.1.2.1",
+    "q": "Manslaughter in circumstances of gross violence requires proof beyond reasonable doubt that: • the offender: • caused the victim’s death in company with two or more people; or • entered into an agreement, arrangement or understanding with two or more people to engage in the conduct that caused the victim’s death; and • the offender: • planned in advance to have and use an offensive weapon or firearm, and did use the offensive weapon or firearm to cause the victim’s death; or • planned in advance to engage in the conduct that caused the victim’s death and at the time of planning a reasonable person would have foreseen that the conduct would be likely to result in death; or • caused two or more serious injuries to the victim during a sustained or prolonged attack.",
+    "via": "mmnpp.gross_violence_definition",
+    "path": "Part C – Sanctions > 9 – Statutory Schemes > 9.1 – Mandatory imprisonment schemes > 9.1.2 – Mandatory minimum sentences > 9.1.2.1 – Manslaughter offences – 10-year minimum non-parole period",
+    "pages": [
+     242,
+     243
+    ],
+    "fns": [
+     1973
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "9.1.2.1",
+    "q": "In addition, the minimum non-parole period for manslaughter by a single punch or strike does not apply to a person who intentionally directed, assisted or encouraged the offence, or who intentionally directed, assisted or encouraged another offence knowing it was probable the charged offence would occur.",
+    "via": "mmnpp.manslaughter_10y",
+    "path": "Part C – Sanctions > 9 – Statutory Schemes > 9.1 – Mandatory imprisonment schemes > 9.1.2 – Mandatory minimum sentences > 9.1.2.1 – Manslaughter offences – 10-year minimum non-parole period",
+    "pages": [
+     242,
+     243
+    ],
+    "fns": [
+     1978
+    ],
+    "authorities": [
+     "C1420",
+     "L0009"
+    ]
+   },
+   {
+    "s": "20.1.2",
+    "q": "• finds the offender guilty of a specified offence that was committed in a designated area;",
+    "path": "Part D – Ancillary Proceedings and Orders > 20 – Other ancillary orders > 20.1 – Alcohol related orders > 20.1.2 – Exclusion orders",
+    "pages": [
+     394,
+     396
+    ],
+    "fns": [
+     3258
+    ],
+    "authorities": [
+     "L0022"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.co_offenders",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "comparables"
+  ],
+  "field": "co_offenders[]",
+  "type": "role, charges, plea, personal circumstances and sentence (including non-parole period) of each co-offender",
+  "title": "Co-offenders and their sentences",
+  "statement": "Parity requires any significant difference to be rationally explained, comparing all components.",
+  "needed_for": [
+   "principle.parity",
+   "principle.parity_appeals",
+   "factor.principal_or_accessory_unknown",
+   "anc.compensation.amount",
+   "anc.restitution",
+   "principle.parity_detail"
+  ],
+  "refs": [
+   {
+    "s": "3.6",
+    "q": "The concept is simply that when two or more co-offenders are sentenced, any significant difference in the sentences imposed upon them should be capable of a rational explanation.",
+    "via": "principle.parity",
+    "path": "Part B – Principles, Purposes and Considerations > 3 – Sentencing principles > 3.6 – Parity",
+    "pages": [
+     83,
+     87
+    ],
+    "fns": [
+     578
+    ],
+    "authorities": [
+     "C0389",
+     "C0390",
+     "C0391"
+    ]
+   },
+   {
+    "s": "3.6",
+    "q": "Comparison of the head sentence alone is not an adequate measure of parity. All components of the sentence (including any non-parole period) must be considered, and if totality requires different sentences between the co-offenders, then parity is not breached.",
+    "via": "principle.parity",
+    "path": "Part B – Principles, Purposes and Considerations > 3 – Sentencing principles > 3.6 – Parity",
+    "pages": [
+     83,
+     87
+    ],
+    "fns": [
+     610
+    ],
+    "authorities": [
+     "C0270"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.mental_health",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "offender",
+   "disposition"
+  ],
+  "field": "offender.mental_health: condition, at offence / at sentence, expert reports, link to offending, self-induced intoxication; mental_illness_at_sentence (actual / apparent / none); intellectual_disability (with any DHS Secretary statement); DHS Secretary’s specification for a residential treatment order",
+  "type": "structured with evidence references",
+  "title": "Mental impairment and expert evidence",
+  "statement": "Verdins, the Category 2 impaired-mental-functioning exceptions, mandatory minimum special reasons and mental health orders all require evidence of the condition at the relevant time and its effect. The mental health orders distinguish: a court assessment order needs only an apparent mental illness, a court secure treatment order an actual one at sentence; intellectual disability alone is not “mental illness” and an RTO or justice plan condition needs a DHS Secretary statement or specification.",
+  "needed_for": [
+   "factor.verdins",
+   "factor.verdins_evidence",
+   "cat2.custodial_unless",
+   "mm.special_reason",
+   "order.csto",
+   "order.court_assessment_order",
+   "mmnpp.protected_officials",
+   "indefinite.requirements",
+   "order.rto",
+   "order.cco.condition_justice_plan",
+   "order.mtmo",
+   "csto.mental_illness_meaning"
+  ],
+  "refs": [
+   {
+    "s": "6.2.2.11",
+    "q": "There needs to be cogent evidence, normally in the form of expert evidence, establishing on the balance of the probabilities that the Verdins principles are enlivened. The evidence must establish that the impairment existed at the time of offending, sentence, or both, as well as its nature, extent, and effect on the offender or its likely effect on them in the future. Expert evidence also needs to be assessed against what is known about the circumstances of the offending.",
+    "via": "factor.verdins_evidence",
+    "path": "Part B – Principles, Purposes and Considerations > 6 – Circumstances of the offender > 6.2 – Health > 6.2.2 – Mental impairment > 6.2.2.11 – Consideration and evidence",
+    "pages": [
+     157,
+     159
+    ],
+    "fns": [
+     1224,
+     1225,
+     1226
+    ],
+    "authorities": [
+     "C0959",
+     "C0964",
+     "C1022",
+     "C0521",
+     "C0961",
+     "C0990",
+     "C0978"
+    ]
+   },
+   {
+    "s": "9.1.1",
+    "q": "this provision cannot apply if there is no extant mental illness at the time of sentence, only the possibility that one might be developed in prison;",
+    "via": "cat2.custodial_unless",
+    "path": "Part C – Sanctions > 9 – Statutory Schemes > 9.1 – Mandatory imprisonment schemes > 9.1.1 – Category 1 and 2 offences",
+    "pages": [
+     239,
+     241
+    ],
+    "fns": [
+     1954
+    ],
+    "authorities": [
+     "O0005"
+    ]
+   },
+   {
+    "s": "15.1",
+    "q": "Orders under the Act can only be made if, among other requirements, the court is satisfied that the offender ‘appears to have a mental illness’ (in the case of a court assessment order) or in fact has a mental illness (in the case of a court secure treatment order).",
+    "path": "Part C – Sanctions > 15 – Court assessment and secure treatment orders > 15.1 – Mental illness",
+    "pages": [
+     328,
+     328
+    ],
+    "fns": [],
+    "authorities": []
+   },
+   {
+    "s": "15.1",
+    "q": "In Victoria, ‘mental illness’ is a medical condition that is characterised by a significant disturbance of thought, mood, perception or memory. A person is not considered to have a mental illness only because they: • express, refuse, or fail to express a particular political opinion or belief; • express, refuse, or fail to express a particular religious opinion or belief; • express, refuse, or fail to express a particular philosophy; • express, refuse, or fail to express a particular sexual preference, gender identity or sexual orientation; • engage in, refuse, or fail to engage in a particular political activity; • engage in, refuse, or fail to engage in a particular religious activity; • engage in sexual promiscuity; • engage in immoral conduct; • engage in illegal conduct; • engage in antisocial behaviour; • are intellectually disabled; • use drugs or consume alcohol; • have a particular economic or social status or are a member of a particular cultural or racial group; • are or have previously been involved in family conflict; • have previously been treated for mental illness.",
+    "via": "csto.mental_illness_meaning",
+    "path": "Part C – Sanctions > 15 – Court assessment and secure treatment orders > 15.1 – Mental illness",
+    "pages": [
+     328,
+     328
+    ],
+    "fns": [
+     2672,
+     2673
+    ],
+    "authorities": [
+     "L0002",
+     "L0027"
+    ]
+   },
+   {
+    "s": "14",
+    "q": "An RTO may only be ordered if the DHS Secretary has specified:",
+    "path": "Part C – Sanctions > 14 – Residential treatment orders",
+    "pages": [
+     323,
+     326
+    ],
+    "fns": [],
+    "authorities": []
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.substances",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "offender",
+   "ancillary"
+  ],
+  "field": "offender.addiction; offender.dependency_contributed; offender.intoxicated_by_liquor; offender.intoxicated_by_drug; intoxication_contributed; previous_aeo_for_offence",
+  "type": "structured (each yes / no / unknown, with evidence)",
+  "title": "Addiction and intoxication",
+  "statement": "Addiction and intoxication bear on culpability, rehabilitation and the choice of sanction. A DATO needs a dependency on drugs or alcohol that contributed to the offence (balance of probabilities). An alcohol exclusion order is mandatory only where a conviction is recorded for a relevant offence, the offender was intoxicated by liquor (“intoxicated” refers to the consumption of liquor), the intoxication significantly contributed, and there has been no previous AEO for the offence.",
+  "needed_for": [
+   "factor.addiction",
+   "factor.intoxication",
+   "anc.alcohol_exclusion_order",
+   "order.dato",
+   "audit.mandatory_ancillary_orders"
+  ],
+  "refs": [
+   {
+    "s": "6.2.3",
+    "q": "Lastly, an offender’s addiction may be relevant to the choice of sanction, either because it may qualify them for a sanction specifically tailored to their addiction or by emphasising the value of a general rehabilitative sanction.",
+    "via": "factor.addiction",
+    "path": "Part B – Principles, Purposes and Considerations > 6 – Circumstances of the offender > 6.2 – Health > 6.2.3 – Addictions",
+    "pages": [
+     159,
+     160
+    ],
+    "fns": [
+     1248
+    ],
+    "authorities": []
+   },
+   {
+    "s": "6.2.4",
+    "q": "Intoxication – whether through alcohol or narcotic consumption – will rarely mitigate offending, and may even be an aggravating factor. For intoxication to reduce moral culpability, the circumstances will have to be ‘quite exceptional’. The key question is the degree of foreknowledge. If the offender knew of the likely consequences of drug ingestion their culpability is increased, and intoxication may be an aggravating factor. Where a long history of alcohol consumption has not revealed the slightest indication that an offender poses a risk of violence, this may mean the circumstances are sufficiently exceptional to be mitigating.",
+    "via": "factor.intoxication",
+    "path": "Part B – Principles, Purposes and Considerations > 6 – Circumstances of the offender > 6.2 – Health > 6.2.4 – Intoxication",
+    "pages": [
+     160,
+     160
+    ],
+    "fns": [
+     1249,
+     1250,
+     1251,
+     1252,
+     1253
+    ],
+    "authorities": [
+     "C1030",
+     "C0796",
+     "C1031",
+     "C0045",
+     "C0733",
+     "C0291",
+     "C1032"
+    ]
+   },
+   {
+    "s": "20.1.1",
+    "q": "The Act provides that a court must make an AEO if: • it records a conviction against the offender for a relevant offence; and • it is satisfied on the balance of probabilities that: • at the time of the relevant offence the offender was intoxicated; and • the offender's intoxication significantly contributed to the commission of the relevant offence; and • the offender is not, or has not been, the subject of a previous AEO in relation to the current offence.",
+    "via": "anc.alcohol_exclusion_order",
+    "path": "Part D – Ancillary Proceedings and Orders > 20 – Other ancillary orders > 20.1 – Alcohol related orders > 20.1.1 – Alcohol exclusion orders",
+    "pages": [
+     392,
+     394
+    ],
+    "fns": [
+     3229,
+     3230
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "15A.3",
+    "q": "• the court is satisfied on the balance of probabilities that the offender is dependent on drugs or alcohol and that their dependency contributed to the commission of the offence",
+    "via": "order.dato",
+    "path": "Part C – Sanctions > 15A – Drug and Alcohol Treatment Orders > 15A.3 – Eligibility and limits",
+    "pages": [
+     347,
+     348
+    ],
+    "fns": [
+     2828
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "fn": 3229,
+    "q": "Sentencing Act 1991 (Vic) s 89DC (‘the Act’) defines ‘intoxicated’ as where ‘the person's speech, balance, coordination or behaviour is noticeably affected as a result of the consumption of liquor’.",
+    "section": "20.1.1",
+    "page": 392,
+    "fns": [
+     3229
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.personal_circumstances",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "offender"
+  ],
+  "field": "offender: background and childhood deprivation, Aboriginality and Koori Court participation, employment, family and dependants, physical health and disability, pregnancy or gender-related custody factors; conviction_impact (employment, profession, visa, travel — with evidence); licence_need (employment, treatment transport, CCO conditions)",
+  "type": "structured with evidence references",
+  "title": "Personal circumstances",
+  "statement": "Childhood deprivation must be considered; employment history indicates rehabilitation prospects; ill health matters if it makes imprisonment more burdensome; third-party hardship needs exceptional circumstances (but see flag.third_party_hardship_exceptionality); Koori Court participation may mitigate. Whether to record a conviction requires the impact of a conviction on economic or social wellbeing or employment prospects; the need for a licence bears on the disqualification period.",
+  "needed_for": [
+   "factor.bugmy_childhood_deprivation",
+   "factor.employment",
+   "factor.physical_health",
+   "hardship.third_parties",
+   "factor.koori_court",
+   "factor.gender",
+   "hardship.pregnancy_transgender",
+   "sentence.recording_conviction",
+   "order.adjourned_undertaking",
+   "order.dismissal",
+   "order.licence_disqualification"
+  ],
+  "related": [
+   "flag.third_party_hardship_exceptionality",
+   "flag.physical_health_thresholds"
+  ],
+  "refs": [
+   {
+    "s": "6.3.3.1",
+    "q": "Bugmy has made clear that an offender’s circumstances and experiences of deprivation or violence during their childhood and formative years must be considered in sentencing – not just out of historical curiosity but because the effects of social disadvantage do not diminish with time.",
+    "via": "factor.bugmy_childhood_deprivation",
+    "path": "Part B – Principles, Purposes and Considerations > 6 – Circumstances of the offender > 6.3 – Actions and behaviour > 6.3.3 – Personal history and circumstances > 6.3.3.1 – Childhood",
+    "pages": [
+     165,
+     167
+    ],
+    "fns": [
+     1299
+    ],
+    "authorities": [
+     "C0930",
+     "C1070",
+     "C1071"
+    ]
+   },
+   {
+    "s": "6.3.3.2",
+    "q": "The employment history of an offender is relevant during sentencing as it is an indication of their prospects for rehabilitation.",
+    "via": "factor.employment",
+    "path": "Part B – Principles, Purposes and Considerations > 6 – Circumstances of the offender > 6.3 – Actions and behaviour > 6.3.3 – Personal history and circumstances > 6.3.3.2 – Employment",
+    "pages": [
+     167,
+     167
+    ],
+    "fns": [
+     1321
+    ],
+    "authorities": [
+     "C0465"
+    ]
+   },
+   {
+    "s": "6.2.1",
+    "q": "The physical health or disability of the offender is relevant where: • imprisonment will be a greater burden because of their health; or • there is a serious risk of imprisonment having a grave effect on their health.",
+    "via": "factor.physical_health",
+    "path": "Part B – Principles, Purposes and Considerations > 6 – Circumstances of the offender > 6.2 – Health > 6.2.1 – Physical health or disability",
+    "pages": [
+     146,
+     146
+    ],
+    "fns": [
+     1116
+    ],
+    "authorities": [
+     "C0939",
+     "C0940"
+    ]
+   },
+   {
+    "s": "6.1.3",
+    "q": "Moreover, an Aboriginal offender’s participation in a Koori Court sentencing conversation may be mitigating because of various factors, including:",
+    "via": "factor.koori_court",
+    "path": "Part B – Principles, Purposes and Considerations > 6 – Circumstances of the offender > 6.1 – Innate characteristics > 6.1.3 – Ethnicity, culture and race",
+    "pages": [
+     145,
+     146
+    ],
+    "fns": [
+     1107
+    ],
+    "authorities": [
+     "C0933",
+     "C0465",
+     "C0934"
+    ]
+   },
+   {
+    "s": "2.4.1",
+    "q": "In deciding whether to record a conviction, a court must consider all the circumstances of the case including the nature of the offence, the character and history of the offender, and the impact of recording a conviction on their economic or social well-being, or employment prospects.",
+    "path": "Part A – Method and Process > 2 – Method and process > 2.4 – Imposition of sentence > 2.4.1 – Defining ‘sentence’",
+    "pages": [
+     46,
+     48
+    ],
+    "fns": [
+     248
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "16.5",
+    "q": "A court must consider the disqualification period’s effect on rehabilitation and whether the period fixed would be counter-productive to its achievement.",
+    "path": "Part C – Sanctions > 16 – Licence disqualification > 16.5 – Determining period of disqualification",
+    "pages": [
+     356,
+     358
+    ],
+    "fns": [
+     2930
+    ],
+    "authorities": [
+     "C1590"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.character_and_remorse",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "offender"
+  ],
+  "field": "offender.character_evidence; references; remorse_evidence; restitution",
+  "type": "structured with evidence references",
+  "title": "Character, remorse and restitution",
+  "statement": "Good character must be taken into account if established (subject to the child sexual offence exception); remorse must be proved by proper evidence; restitution is mitigating.",
+  "needed_for": [
+   "factor.good_character",
+   "findings.references",
+   "factor.remorse",
+   "factor.restitution"
+  ],
+  "refs": [
+   {
+    "s": "6.3.1.1",
+    "q": "If the evidence establishes that the offender is ‘otherwise of good character’ then, subject to a statutory exception, this must be taken into account in sentencing. However, the weight given to good character will vary according to the circumstances of the case and the offender, and in determining the weight to be given to previous good character there is no prohibition on a court considering the nature and circumstances of the offending.",
+    "via": "factor.good_character",
+    "path": "Part B – Principles, Purposes and Considerations > 6 – Circumstances of the offender > 6.3 – Actions and behaviour > 6.3.1 – Character > 6.3.1.1 – Good character",
+    "pages": [
+     161,
+     162
+    ],
+    "fns": [
+     1262,
+     1263
+    ],
+    "authorities": [
+     "C0224",
+     "C1033"
+    ]
+   },
+   {
+    "s": "6.3.4.1",
+    "q": "An offender who wants to rely on remorse in mitigation must ‘satisfy the court there is genuine penitence and contrition and a desire to atone’. This must be established on proper evidence and a court should be cautious before accepting that an offender’s guilty plea indicates remorse warranting more than a utilitarian discount.",
+    "via": "factor.remorse",
+    "path": "Part B – Principles, Purposes and Considerations > 6 – Circumstances of the offender > 6.3 – Actions and behaviour > 6.3.4 – Remorse and restitution > 6.3.4.1 – Remorse",
+    "pages": [
+     168,
+     171
+    ],
+    "fns": [
+     1333,
+     1334
+    ],
+    "authorities": [
+     "C0372",
+     "C1088",
+     "C0764",
+     "C0137"
+    ]
+   },
+   {
+    "s": "6.3.4.2",
+    "q": "but apart from that it is also a relevant factor at common law that allows for a sentence to be reduced or a shorter non-parole period to be fixed. But even full reparation does not entitle an offender to avoid all aspects of punishment.",
+    "via": "factor.restitution",
+    "path": "Part B – Principles, Purposes and Considerations > 6 – Circumstances of the offender > 6.3 – Actions and behaviour > 6.3.4 – Remorse and restitution > 6.3.4.2 – Restitution",
+    "pages": [
+     171,
+     172
+    ],
+    "fns": [
+     1359,
+     1360
+    ],
+    "authorities": [
+     "C1108",
+     "C1060",
+     "C1109",
+     "C1110"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.cooperation",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "offender"
+  ],
+  "field": "cooperation",
+  "type": "none | admissions | assistance given | undertaking to assist (nature, risk, evidence given)",
+  "title": "Cooperation with authorities",
+  "statement": "Assistance or an undertaking to assist affects the sentence, must be announced and recorded, and is an exception to the Category 2 and mandatory minimum regimes.",
+  "needed_for": [
+   "coop.levels_and_quantum",
+   "coop.victorian_statement_requirements",
+   "cat2.custodial_unless",
+   "mm.special_reason"
+  ],
+  "refs": [
+   {
+    "s": "7.3.3.1",
+    "q": "Under the Victorian scheme, if a sentencing court imposes a less severe sentence than it otherwise would have because the offender has undertaken to assist law enforcement authorities, the court must both announce that it is doing this and have the details of the undertaking placed in the record. Failure to comply with these requirements does not automatically vitiate a sentencing exercise, but compliance with them remains important.",
+    "via": "coop.victorian_statement_requirements",
+    "path": "Part B – Principles, Purposes and Considerations > 7 – Policy considerations > 7.3 – Co-operation with the authorities > 7.3.3 – State v Commonwealth scheme > 7.3.3.1 – Identification of discount",
+    "pages": [
+     192,
+     192
+    ],
+    "fns": [
+     1532,
+     1533,
+     1534
+    ],
+    "authorities": [
+     "L0002",
+     "C1165",
+     "C1177",
+     "C1178"
+    ]
+   },
+   {
+    "s": "9.1.3",
+    "q": "Firstly, if the offender has assisted or given an undertaking to assist authorities in the prosecution or investigation of an offence.",
+    "via": "mm.special_reason",
+    "path": "Part C – Sanctions > 9 – Statutory Schemes > 9.1 – Mandatory imprisonment schemes > 9.1.3 – Special reason",
+    "pages": [
+     247,
+     249
+    ],
+    "fns": [
+     2006
+    ],
+    "authorities": []
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.delay",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "policy"
+  ],
+  "field": "dates: offence, interview, charge, plea, sentence; cause of delay; rehabilitation since",
+  "type": "dates and evidence",
+  "title": "Delay",
+  "statement": "Delay may mitigate on either limb (unfairness, rehabilitation), each requiring some evidence; its cause matters.",
+  "needed_for": [
+   "policy.delay",
+   "policy.delay_undue_and_responsibility",
+   "policy.delay_consequences"
+  ],
+  "refs": [
+   {
+    "s": "7.5",
+    "q": "Significant delay between the time an offender is interviewed by police and the time charges are laid, as well as delay between the laying of charges and trial, can be a powerful mitigating factor. However, delay in itself creates no automatic right to a sentencing discount. The most that can be said is that where the prosecution unduly delays bringing the matter to court there is much more likely to be a discount.",
+    "via": "policy.delay",
+    "path": "Part B – Principles, Purposes and Considerations > 7 – Policy considerations > 7.5 – Delay",
+    "pages": [
+     196,
+     196
+    ],
+    "fns": [
+     1570,
+     1571
+    ],
+    "authorities": [
+     "C0644",
+     "C1193",
+     "C0180"
+    ]
+   },
+   {
+    "s": "7.5.1",
+    "q": "Where an offender relies on either limb of delay, they must provide some evidence to support the submission.",
+    "via": "policy.delay",
+    "path": "Part B – Principles, Purposes and Considerations > 7 – Policy considerations > 7.5 – Delay > 7.5.1 – Evidence of delay",
+    "pages": [
+     196,
+     197
+    ],
+    "fns": [
+     1578
+    ],
+    "authorities": [
+     "C0644"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.custody_and_deportation",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "policy"
+  ],
+  "field": "custody conditions (protection, health, COVID measures); in_custody_at_sentence (yes / no); visa status and evidence of deportation risk",
+  "type": "structured with evidence references",
+  "title": "Conditions of custody; deportation risk; custody at sentence",
+  "statement": "Protective custody and onerous conditions are relevant on evidence of actual effect; deportation is relevant only with evidence of its likelihood and impact; a court assessment order requires that the person is not in custody pending sentencing.",
+  "needed_for": [
+   "hardship.protection_prisoner",
+   "hardship.covid_custody",
+   "hardship.deportation",
+   "npp.deportation",
+   "order.court_assessment_order"
+  ],
+  "refs": [
+   {
+    "s": "7.6.2.1",
+    "q": "In assessing the weight to be given to this factor, the court must assess the actual effect on the offender of their classification as a protection prisoner. The degree of restriction varies greatly from one case to the other.",
+    "via": "hardship.protection_prisoner",
+    "path": "Part B – Principles, Purposes and Considerations > 7 – Policy considerations > 7.6 – Hardship of sanction > 7.6.2 – Hardship of imprisonment > 7.6.2.1 – Protection prisoners",
+    "pages": [
+     203,
+     204
+    ],
+    "fns": [],
+    "authorities": []
+   },
+   {
+    "s": "7.6.2.7",
+    "q": "There must also be evidence of both the likely risk of deportation and the impact of that risk. Specifically, the evidence must be ‘sufficient to permit a sensible quantification of that risk to be undertaken’. A reduction will be permissible and appropriate where the prospect of deportation (and its impact) is certain. It may also be appropriate where deportation and its adverse impacts are probable.",
+    "via": "hardship.deportation",
+    "path": "Part B – Principles, Purposes and Considerations > 7 – Policy considerations > 7.6 – Hardship of sanction > 7.6.2 – Hardship of imprisonment > 7.6.2.7 – Deportation",
+    "pages": [
+     207,
+     208
+    ],
+    "fns": [
+     1665,
+     1666,
+     1667,
+     1668
+    ],
+    "authorities": [
+     "C1251",
+     "C1258",
+     "C1259"
+    ]
+   },
+   {
+    "s": "15.3.1",
+    "q": "• the person is not in custody pending sentencing;",
+    "path": "Part C – Sanctions > 15 – Court assessment and secure treatment orders > 15.3 – Court assessment orders > 15.3.1 – Required criteria",
+    "pages": [
+     330,
+     330
+    ],
+    "fns": [
+     2691
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.other_offending",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "facts"
+  ],
+  "field": "offences to be taken into account (s 100); uncharged conduct alleged",
+  "type": "list",
+  "title": "Offences taken into account and uncharged conduct",
+  "statement": "Admitted pending offences may harden (not lengthen beyond the maximum) the sentence; uncharged conduct may not be punished as a separate or more serious offence.",
+  "needed_for": [
+   "sentence.other_offences_into_account",
+   "factor.uncharged_conduct",
+   "findings.no_more_serious_offence",
+   "anc.compensation.amount",
+   "anc.restitution"
+  ],
+  "refs": [
+   {
+    "s": "2.4.8",
+    "q": "If offences are admitted and are to be considered, the court cannot impose more than the maximum penalty available for the offence(s) in respect of which sentence is formally being passed. Nor can it result in a lesser sentence. Instead it has the effect of hardening the sentence particularly if it is a serious offence. However, as general policy, this procedure should not be used for the disposal of serious offences.",
+    "via": "sentence.other_offences_into_account",
+    "path": "Part A – Method and Process > 2 – Method and process > 2.4 – Imposition of sentence > 2.4.8 – Taking other offences into account",
+    "pages": [
+     56,
+     56
+    ],
+    "fns": [
+     329,
+     330,
+     331
+    ],
+    "authorities": [
+     "L0002",
+     "L0008",
+     "C0203",
+     "C0204"
+    ]
+   },
+   {
+    "s": "5.2.8.5",
+    "q": "Uncharged conduct or discreditable conduct may be treated as an aggravating feature of the offence, and as an indicator of increased moral culpability. But where the uncharged conduct constitutes an aggravated version of the offending or should have been alleged as a separate charge entirely, a court may not take it into account. Uncharged acts cannot be taken as aggravating factors where they warrant conviction for a more serious offence.",
+    "via": "factor.uncharged_conduct",
+    "path": "Part B – Principles, Purposes and Considerations > 5 – Circumstances and gravity of the offence > 5.2 – Statutory factors > 5.2.8 – Aggravating, mitigating, and other relevant circumstances > 5.2.8.5 – Uncharged conduct and surrounding facts",
+    "pages": [
+     130,
+     131
+    ],
+    "fns": [],
+    "authorities": []
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.driving",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "ancillary"
+  ],
+  "field": "per charge: arising_from_driving (yes / no / unknown); under the influence of alcohol, or of alcohol and a drug; police pursuit; vehicle theft; RSA s 61(3) charge and any previous s 61(3) offence; licence status: Victorian licence or permit / interstate or overseas licence / none / unknown; current suspensions (including RSA Part 6B); licence history",
+  "type": "structured",
+  "title": "Driving-related facts (licence orders; driving-linked guidance)",
+  "statement": "Serious motor vehicle offences require disqualification with a minimum period (cancellation for a Victorian licence or permit holder; the form follows the licence status); conviction for dangerous or negligent driving while pursued by police, and for vehicle theft, also requires disqualification; RSA s 61(3) requires cancellation and disqualification (4 or 2 years for a first offence, 8 or 4 for a subsequent one, depending on whether a conviction is recorded); other offences connected with driving allow discretionary disqualification. “Arising from driving” also decides whether the NCSI-by-driving guidance applies to a s 24 charge (s 24 is a generic offence).",
+  "needed_for": [
+   "order.licence_disqualification",
+   "licence.serious_mv_offences",
+   "order.licence.discretionary",
+   "licence.other_mandatory",
+   "licence.form_by_licence_status",
+   "order.licence.concurrency_and_rsa",
+   "audit.mandatory_ancillary_orders",
+   "guide.driving.failing_to_stop_or_assist",
+   "guide.injury.ncsi_driving_gravity",
+   "guide.driving.current_practice"
+  ],
+  "refs": [
+   {
+    "s": "16.1",
+    "q": "For dangerous driving causing death or serious injury, the minimum period of disqualification is 18 months. For a substance-influenced offence (other than aggravated carjacking), the minimum period of disqualification is 12 months. For any other serious motor vehicle offence, the minimum disqualification period is two years.",
+    "via": "order.licence_disqualification",
+    "path": "Part C – Sanctions > 16 – Licence disqualification > 16.1 – Mandatory disqualification",
+    "pages": [
+     352,
+     354
+    ],
+    "fns": [
+     2894,
+     2895,
+     2896
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "16.2",
+    "q": "‘In connection’ requires a substantial relation between the other offence and the driving of a motor vehicle, but not the manner of driving.",
+    "via": "order.licence.discretionary",
+    "path": "Part C – Sanctions > 16 – Licence disqualification > 16.2 – Discretionary licence disqualification",
+    "pages": [
+     354,
+     355
+    ],
+    "fns": [
+     2913
+    ],
+    "authorities": [
+     "C1587"
+    ]
+   },
+   {
+    "s": "16.1",
+    "q": "Mandatory disqualification also follows if an offender has been convicted for: • dangerous or negligent driving while being pursued by police; or • stealing or attempting to steal a motor vehicle.",
+    "via": "licence.other_mandatory",
+    "path": "Part C – Sanctions > 16 – Licence disqualification > 16.1 – Mandatory disqualification",
+    "pages": [
+     352,
+     354
+    ],
+    "fns": [
+     2897,
+     2898
+    ],
+    "authorities": [
+     "L0002",
+     "L0009"
+    ]
+   },
+   {
+    "s": "23.1.1",
+    "q": "1st offence - license cancellation and dis-qualification for at least 4 years if conviction recorded, 2 years otherwise Subsequent offence - licence cancellation and dis-qualification for at least 8 years if conviction recorded, at least 4 years otherwise",
+    "path": "Part E – Specific offences > 23 – Indictable driving offences > 23.1 – Penalties and current sentencing practice > 23.1.1 – Penalties",
+    "pages": [
+     422,
+     424
+    ],
+    "fns": [],
+    "authorities": []
+   },
+   {
+    "s": "25.2.3",
+    "q": "Negligently causing serious injury is a generic offence that might apply to any conduct that causes serious injury. However, it is most often laid when injury results from driving.",
+    "path": "Part E – Specific offences > 25 – Causing injury > 25.2 – Gravity and culpability > 25.2.3 – Negligently cause serious injury by driving",
+    "pages": [
+     505,
+     507
+    ],
+    "fns": [
+     3867
+    ],
+    "authorities": [
+     "C0543"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.financial_and_property",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "ancillary",
+   "disposition"
+  ],
+  "field": "means (income, assets, liabilities); property used in or derived from the offence (with any credible material on its lawful source and its value); benefits; whether a forfeiture, pecuniary penalty, compensation or restitution application has been made or foreshadowed (and by whom, and when); whether the offender is or will be declared a serious drug offender; any VOCA (victims of crime assistance) award; the date the hearing commenced",
+  "type": "structured",
+  "title": "Financial circumstances, property and claims",
+  "statement": "Means bear on a fine’s amount (after deciding to fine) and on compensation; the onus is on the offender to put material before the court about their financial circumstances. Confiscation and compensation orders interact with the sentence: each is made on application (personal injury compensation only on the injured person’s application); an offender relying on lawful acquisition must present credible material; the court may not take into account the automatic forfeiture of a serious drug offender’s property; personal injury compensation must be reduced by any VOCA Act award; own-motion property compensation is available only where the hearing commenced on or after 31 January 2013.",
+  "needed_for": [
+   "fine.amount_factors",
+   "anc.confiscation.available_orders",
+   "anc.compensation.amount",
+   "anc.restitution",
+   "anc.confiscation.effect_on_sentence",
+   "anc.confiscation.jurisdiction",
+   "anc.compensation.personal_injury_threshold",
+   "anc.compensation.property_threshold",
+   "anc.compensation.interaction_with_sentence",
+   "order.cco.condition_bond",
+   "order.fine.third_party_payment"
+  ],
+  "refs": [
+   {
+    "s": "12.3.1",
+    "q": "An offender’s financial circumstances can only be considered after the court has decided to impose a fine; they are irrelevant to determining if a fine should be imposed.",
+    "via": "fine.amount_factors",
+    "path": "Part C – Sanctions > 12 – Fines > 12.3 – Determining the amount > 12.3.1 – Financial circumstances",
+    "pages": [
+     303,
+     304
+    ],
+    "fns": [
+     2458
+    ],
+    "authorities": [
+     "C1490"
+    ]
+   },
+   {
+    "s": "17.1.1",
+    "q": "Firstly, if an offender is convicted of a Schedule 1 offence (which includes a Schedule 2 offence) a court may, on application, make a forfeiture order for ‘tainted property’ or it may defer sentencing until after determining the forfeiture application.",
+    "via": "anc.confiscation.available_orders",
+    "path": "Part D – Ancillary Proceedings and Orders > 17 – Confiscation > 17.1 – Statutory regime > 17.1.1 – Available orders",
+    "pages": [
+     359,
+     360
+    ],
+    "fns": [
+     2946,
+     2947
+    ],
+    "authorities": [
+     "L0014",
+     "C1603"
+    ]
+   },
+   {
+    "s": "18.1.1.2",
+    "q": "If a court finds a person guilty or convicts them of an offence, and evidence is presented that loss, destruction or damage to property has occurred as a result, the court must ask the prosecution if an application for a compensation order will be made.",
+    "via": "anc.compensation.property_threshold",
+    "path": "Part D – Ancillary Proceedings and Orders > 18 – Compensatory orders > 18.1 – Compensation orders > 18.1.1 – Threshold requirements > 18.1.1.2 – Property loss or damage",
+    "pages": [
+     368,
+     369
+    ],
+    "fns": [
+     3028
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "12.3.1",
+    "q": "The onus is on the offender to put material before the court in relation to their financial circumstances.",
+    "path": "Part C – Sanctions > 12 – Fines > 12.3 – Determining the amount > 12.3.1 – Financial circumstances",
+    "pages": [
+     303,
+     304
+    ],
+    "fns": [
+     2474
+    ],
+    "authorities": [
+     "C1504",
+     "C1490"
+    ]
+   },
+   {
+    "s": "17.2.2",
+    "q": "An offender must present ‘credible material’ identifying the property’s source, so the court may positively conclude that at least a substantial portion was lawfully acquired.",
+    "path": "Part D – Ancillary Proceedings and Orders > 17 – Confiscation > 17.2 – Interaction with sentencing principles and purposes > 17.2.2 – Punishment",
+    "pages": [
+     364,
+     364
+    ],
+    "fns": [
+     2991
+    ],
+    "authorities": [
+     "C1276"
+    ]
+   },
+   {
+    "s": "18.1.1.1",
+    "q": "A compensation order for personal injury may only be made on application by the injured person, who may appear personally or be represented by a legal practitioner or third party.",
+    "path": "Part D – Ancillary Proceedings and Orders > 18 – Compensatory orders > 18.1 – Compensation orders > 18.1.1 – Threshold requirements > 18.1.1.1 – Personal injury compensation",
+    "pages": [
+     366,
+     368
+    ],
+    "fns": [
+     3009,
+     3010
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "17.2.1",
+    "q": "The Act also prohibits a court from taking into account the automatic forfeiture of a serious drug offender’s property.",
+    "path": "Part D – Ancillary Proceedings and Orders > 17 – Confiscation > 17.2 – Interaction with sentencing principles and purposes > 17.2.1 – Proportionality",
+    "pages": [
+     363,
+     364
+    ],
+    "fns": [
+     2986
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "18.1.4.4",
+    "q": "For personal injury compensation orders, any amount ordered must be reduced by any compensation awarded under the VOCA Act.",
+    "path": "Part D – Ancillary Proceedings and Orders > 18 – Compensatory orders > 18.1 – Compensation orders > 18.1.4 – Assessing amount and method of payment > 18.1.4.4 – Discounting and limiting factors",
+    "pages": [
+     376,
+     377
+    ],
+    "fns": [
+     3102
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "fn": 3029,
+    "q": "The court may only make an order on its own motion in respect of offences for which the hearing of the charge commences on or after 31 January 2013:",
+    "section": "18.1.1.2",
+    "page": 369,
+    "fns": [
+     3029
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.reports",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "disposition",
+   "facts"
+  ],
+  "field": "pre-sentence / CCO assessment report (and its findings on rehabilitation prospects or vulnerability in adult prison); DATO assessment; psychiatric, psychological and medical reports (including a psychiatrist’s or registered psychologist’s report on impaired mental functioning linked to the offending; reports made under a Court Assessment Order)",
+  "type": "available | ordered | none, plus content: PSR findings (suitability; rehabilitation prospects or impressionability; any positive statement about electronic monitoring); the authorised psychiatrist’s recommendation (CSTO) or facilities report (court assessment order); DHS Secretary statements or specification (RTO; justice plan condition)",
+  "title": "Reports",
+  "statement": "A pre-sentence report is required before a CCO (other than a work-only CCO of 300 hours or less — the Manual also says “less than 300 hours”: flag.cco_work_only_300_hours) or youth detention, including the youth justice centre route for protected-official offences; a therapeutic order in place of imprisonment for those offences needs a psychiatrist’s or registered psychologist’s report; electronic monitoring needs a positive PSR statement; a CSTO needs the authorised psychiatrist’s report recommending it; reports do not control the sentence; medical reports should not opine on sentencing principles.",
+  "needed_for": [
+   "findings.reports",
+   "order.cco",
+   "order.cco.presentence_report",
+   "yjc.prerequisites",
+   "order.dato.assessment_and_consent",
+   "mmnpp.protected_officials",
+   "indefinite.requirements",
+   "cco.electronic_monitoring",
+   "order.csto",
+   "order.court_assessment_order",
+   "order.rto",
+   "order.cco.condition_justice_plan",
+   "flag.cco_work_only_300_hours"
+  ],
+  "related": [
+   "flag.cco_work_only_300_hours"
+  ],
+  "refs": [
+   {
+    "s": "2.3.2.2.3",
+    "q": "But if the court is considering making a CCO, a youth justice centre order, or a youth residential centre order, it must order a pre-sentence report",
+    "via": "findings.reports",
+    "path": "Part A – Method and Process > 2 – Method and process > 2.3 – Findings > 2.3.2 – Evidence > 2.3.2.2 – Records, depositions, reports, and statements > 2.3.2.2.3 – Reports",
+    "pages": [
+     40,
+     42
+    ],
+    "fns": [
+     173
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "2.3.2.2.3",
+    "q": "Its discretion to sentence is not controlled by the report, and the fact that the report recommends a certain disposition does not compel the court to impose that sentencing option.",
+    "via": "findings.reports",
+    "path": "Part A – Method and Process > 2 – Method and process > 2.3 – Findings > 2.3.2 – Evidence > 2.3.2.2 – Records, depositions, reports, and statements > 2.3.2.2.3 – Reports",
+    "pages": [
+     40,
+     42
+    ],
+    "fns": [
+     183
+    ],
+    "authorities": [
+     "C0152",
+     "C0148",
+     "C0105"
+    ]
+   },
+   {
+    "s": "9.1.2.3",
+    "q": "• the offender, at the time of being sentenced, is under the age of 21; • the court does not find special reasons for not applying the statutory minimum; and • the court has received a pre-sentence report and believes that: • the offender has reasonable prospects for rehabilitation; or • the offender is particularly impressionable, immature or likely to be subjected to undesirable influences in an adult prison.",
+    "via": "mmnpp.protected_officials",
+    "path": "Part C – Sanctions > 9 – Statutory Schemes > 9.1 – Mandatory imprisonment schemes > 9.1.2 – Mandatory minimum sentences > 9.1.2.3 – Violence offences against protected officials – six-month to five-year minimum non-parole period",
+    "pages": [
+     243,
+     245
+    ],
+    "fns": [
+     1984
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "9.1.2.3",
+    "q": "A court may only make one of these therapeutic orders if: • the offender proves on the balance of probabilities that, at the time of the commission of the offence, they had impaired mental functioning that is causally linked to the commission of the offence and substantially and materially reduces their culpability; • the impaired mental function was not caused substantially by self-induced intoxication; • the court has received a report addressing these matters from a psychiatrist or a registered psychologist who has examined the offender in relation to the offending; • the court has had regard to that report and any other evidence it considers relevant; and • the court is satisfied that a mandatory treatment and monitoring order, a Residential Treatment Order, or a Court Secure Treatment Order, as the case requires, is appropriate.",
+    "via": "mmnpp.protected_officials",
+    "path": "Part C – Sanctions > 9 – Statutory Schemes > 9.1 – Mandatory imprisonment schemes > 9.1.2 – Mandatory minimum sentences > 9.1.2.3 – Violence offences against protected officials – six-month to five-year minimum non-parole period",
+    "pages": [
+     243,
+     245
+    ],
+    "fns": [
+     1987
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "11.4.2.11",
+    "q": "A court may only attach an electronic monitoring requirement if: • the pre-sentence report includes a positive statement",
+    "path": "Part C – Sanctions > 11 – Community correction order > 11.4 – Conditions > 11.4.2 – Discretionary conditions > 11.4.2.11 – Electronic monitoring condition",
+    "pages": [
+     282,
+     283
+    ],
+    "fns": [],
+    "authorities": []
+   },
+   {
+    "s": "15.4.1",
+    "q": "Finally, a court may only make a court secure treatment order after receiving a report from the authorised psychiatrist of the designated mental health service where it is proposed to treat the person.",
+    "path": "Part C – Sanctions > 15 – Court assessment and secure treatment orders > 15.4 – Court secure treatment orders > 15.4.1 – Required criteria",
+    "pages": [
+     332,
+     332
+    ],
+    "fns": [],
+    "authorities": []
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.prosecution_notices",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "framework",
+   "procedure"
+  ],
+  "field": "prosecution.notice_manslaughter_minimum; prosecution.notice_indefinite_sentence (dates)",
+  "type": "given (date) | not given | unknown",
+  "title": "Prosecution notices that statutory schemes depend on",
+  "statement": "The 10-year manslaughter minimum applies only if the prosecution gives notice that it intends to apply for it; the DPP may apply for an indefinite sentence only after filing a notice of intention on the day of conviction or within five working days (the court may also act on its own initiative, with its own notice and adjournment steps).",
+  "needed_for": [
+   "mmnpp.manslaughter_10y",
+   "indefinite.requirements"
+  ],
+  "refs": [
+   {
+    "s": "9.1.2.1",
+    "q": "In each situation, the prosecution must give notice that it intends to apply for the minimum non-parole period provisions to apply.",
+    "via": "mmnpp.manslaughter_10y",
+    "path": "Part C – Sanctions > 9 – Statutory Schemes > 9.1 – Mandatory imprisonment schemes > 9.1.2 – Mandatory minimum sentences > 9.1.2.1 – Manslaughter offences – 10-year minimum non-parole period",
+    "pages": [
+     242,
+     243
+    ],
+    "fns": [
+     1972
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "8.7",
+    "q": "The DPP may only apply for an indefinite sentence if it has filed a notice of intention to apply either on the day of conviction or within five working days after that date and have made the application itself within 10 working days after the date of the conviction or any longer period fixed by the court with that ten-day period.",
+    "via": "indefinite.requirements",
+    "path": "Part C – Sanctions > 8 – Imprisonment > 8.7 – Indefinite sentence",
+    "pages": [
+     233,
+     237
+    ],
+    "fns": [
+     1915
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.consents",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "disposition"
+  ],
+  "field": "offender.consents_to: cco; adjourned_undertaking; dato (written agreement and informed written consent)",
+  "type": "each yes / no / unknown (unknown → carried as an assumption)",
+  "title": "Offender’s consent or agreement to orders that require it",
+  "statement": "A CCO requires the offender’s informed consent; an adjourned undertaking requires the offender’s agreement to give it; a DATO requires written agreement to the order and to comply with its treatment and supervision part, and informed written consent. Without the fact the order can only be proposed conditionally.",
+  "needed_for": [
+   "cco.consent",
+   "order.adjourned_undertaking",
+   "order.dato",
+   "order.dato.assessment_and_consent"
+  ],
+  "refs": [
+   {
+    "s": "11.1.2",
+    "q": "The offender’s informed consent is required for the imposition of a CCO,",
+    "via": "cco.consent",
+    "path": "Part C – Sanctions > 11 – Community correction order > 11.1 – Prerequisites and limits > 11.1.2 – Consent",
+    "pages": [
+     269,
+     269
+    ],
+    "fns": [
+     2161,
+     2162
+    ],
+    "authorities": [
+     "L0002",
+     "C0105",
+     "O0008"
+    ]
+   },
+   {
+    "s": "13.3.2",
+    "q": "The offender must first agree to give an undertaking before this sentencing option can be used and an agreement obtained just because imprisonment is a realistic alternative does not vitiate the consent.",
+    "path": "Part C – Sanctions > 13 – Dismissals, discharges, and adjournments > 13.3 – Release on adjournment > 13.3.2 – Undertaking and length of order",
+    "pages": [
+     317,
+     317
+    ],
+    "fns": [
+     2573
+    ],
+    "authorities": [
+     "C1533"
+    ]
+   },
+   {
+    "s": "15A.3",
+    "q": "• the offender agrees in writing to the court making the order and to comply with the treatment and supervision part of the order.",
+    "via": "order.dato",
+    "path": "Part C – Sanctions > 15A – Drug and Alcohol Treatment Orders > 15A.3 – Eligibility and limits",
+    "pages": [
+     347,
+     348
+    ],
+    "fns": [
+     2832
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   },
+   {
+    "s": "15A.3.2",
+    "q": "The Drug Court cannot make a DATO without the informed written consent of the offender.",
+    "via": "order.dato.assessment_and_consent",
+    "path": "Part C – Sanctions > 15A – Drug and Alcohol Treatment Orders > 15A.3 – Eligibility and limits > 15A.3.2 – Consent",
+    "pages": [
+     350,
+     350
+    ],
+    "fns": [
+     2861
+    ],
+    "authorities": [
+     "L0002"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.serious_youth_offence",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "disposition",
+   "framework"
+  ],
+  "field": "charges[].serious_youth_offence; offender.prior_serious_youth_offence",
+  "type": "Category A | Category B | none | unknown per charge; prior Category A or B conviction yes / no / unknown",
+  "title": "Serious youth offence categories (youth detention)",
+  "statement": "Before making a detention order for a young offender charged with a Category A serious youth offence, or a Category B one with a prior Category A or B conviction, the court must be satisfied that exceptional circumstances exist. The Manual does not list the offences in each category (flag.serious_youth_offence_categories), so the user must supply them; unknown → caution.",
+  "needed_for": [
+   "yjc.serious_youth_offence",
+   "order.youth_detention",
+   "flag.serious_youth_offence_categories"
+  ],
+  "related": [
+   "flag.serious_youth_offence_categories"
+  ],
+  "refs": [
+   {
+    "s": "10.1.1.2",
+    "q": "Before making a detention order for a young offender charged with a Category A Serious Youth Offence, or with a Category B Serious Youth Offence where they have also previously been convicted of a Category A or B Serious Youth Offence, a court must be satisfied that exceptional circumstances exist.",
+    "via": "yjc.serious_youth_offence",
+    "path": "Part C – Sanctions > 10 – Youth and youth detention > 10.1 – Legislative regime > 10.1.1 – Youth detention orders > 10.1.1.2 – Prerequisites and limits",
+    "pages": [
+     260,
+     261
+    ],
+    "fns": [
+     2100
+    ],
+    "authorities": [
+     "L0002",
+     "C1441"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ },
+ {
+  "id": "intake.retrial",
+  "kind": "intake_field",
+  "check": "gate",
+  "stage": [
+   "procedure",
+   "comparables"
+  ],
+  "field": "retrial: whether this sentencing follows a retrial (or re-sentence after appeal) for the same offence; the sentence previously imposed and its date; changes in circumstances since",
+  "type": "yes / no; previous sentence (type, head sentence, non-parole period)",
+  "title": "Sentencing after a retrial: the previous sentence",
+  "statement": "When sentencing after a retrial the court must have regard to the sentence previously imposed; it is not bound by it, but cases where the second sentence may permissibly exceed the first will be rare (time may have changed the offender’s circumstances).",
+  "needed_for": [
+   "procedure.retrial_previous_sentence",
+   "procedure.correction_and_retrial"
+  ],
+  "refs": [
+   {
+    "s": "2.4.11",
+    "q": "When sentencing after a retrial, a court must have regard to the sentence previously imposed. It is not bound by it, but instances where the second sentence may permissibly exceed the first will be rare.",
+    "via": "procedure.correction_and_retrial",
+    "path": "Part A – Method and Process > 2 – Method and process > 2.4 – Imposition of sentence > 2.4.11 – Sentencing after retrial, in absentia, and by another judicial officer",
+    "pages": [
+     62,
+     63
+    ],
+    "fns": [
+     397
+    ],
+    "authorities": [
+     "C0234",
+     "C0235",
+     "C0236",
+     "C0237",
+     "C0238"
+    ]
+   }
+  ],
+  "source_file": "intake_requirements.py"
+ }
+]

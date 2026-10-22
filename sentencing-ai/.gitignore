@@ -1,0 +1,14 @@
+# Your own OpenAI key for development (used only by scripts/build_index.py).
+# Never commit it.
+.env
+.streamlit/secrets.toml
+
+# Python and editor clutter
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+.DS_Store
+.idea/
+.vscode/
