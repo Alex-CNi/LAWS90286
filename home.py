@@ -1,23 +1,14 @@
-
 import streamlit as st
-
 import api_key
 from app_pages.common import model_settings_sidebar
 from app_pages.theme import apply_theme
 from core import config
 
 st.set_page_config(page_title=config.APP_TITLE, page_icon="⚖️", layout="wide")
-apply_theme()                    # the look: app_pages/theme.py and .streamlit/config.toml
+apply_theme()                    # app theme: app_pages/theme.py and .streamlit/config.toml
 st.logo(str(config.ROOT / "assets" / "logo.svg"), size="large", icon_image=str(config.ROOT / "assets" / "icon.svg"))
 
-# 1a. Keep the Estimate form's values while another page is open. Streamlit deletes
-#     the value of a widget that is not drawn in a run (e.g. on the About page), and
-#     a field shown only conditionally (the scheme question, the end of the offence
-#     period, the sentence-indication fields) could come back with a stale default.
-#     Re-assigning each form key at the top of every run is Streamlit's documented
-#     way to keep widget values across pages. The file uploader cannot be set.
-#     "f_" = the form, "s_" = the simple input's own answers, "cdb_exclude" = the
-#     cases left out of the comparisons.
+# 1 API KEY MODULE
 for _key in [k for k in st.session_state
              if (str(k).startswith(("f_", "s_")) or k == "cdb_exclude") and k != "f_upload"]:
     st.session_state[_key] = st.session_state[_key]
