@@ -1,24 +1,4 @@
-"""
-api_key.py — THE API CREDENTIALS SIDEBAR MODULE.
-
-This is the course module from https://github.com/stoneman-mls/openai_credentials,
-included as the assignment requires, so that each user enters their OWN OpenAI
-API key. Its sidebar title, text box, "Update API Key" button and the session
-variable st.session_state.openai_api_key are unchanged.
-
-Three changes, all for safety (noted in README.md):
-  1. The text box is a password field (type="password"), so the key is not
-     shown on screen.
-  2. The last line no longer prints the whole key on the page; it shows a
-     masked status ("sk-…abcd") in the sidebar instead.
-  3. The module's top-level code is wrapped in render_sidebar_module(), which
-     home.py calls on every rerun. (Python runs a module's top-level
-     code only once per server process, so a plain `import api_key` would draw
-     the sidebar only for the first visitor's first page load.)
-
-The key lives only in this user's session (st.session_state). The app never
-copies it to os.environ, a cache, a file or a log.
-"""
+#This allows the user to enter their own API key to run the program
 
 import streamlit as st
 
