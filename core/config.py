@@ -19,7 +19,7 @@ from pathlib import Path
 # 0. App identity and source
 # ─────────────────────────────────────────────────────────────────────────────
 APP_TITLE = "Victorian Sentencing Estimator"
-APP_VERSION = "2.0"
+APP_VERSION = "2.1"
 
 # The only legal source. Shown on every report (the Manual asks for its edition
 # and disclaimer to accompany anything built from it).
@@ -225,4 +225,5 @@ ROOT = Path(__file__).resolve().parent.parent
 KNOWLEDGE_DIR = ROOT / "knowledge"
 INDEX_DIR = ROOT / "index"
 TEST_CASES_DIR = ROOT / "test_cases"
-CASES_DIR = ROOT / "cases"           # a case database committed here (cases/database.json) is loaded for every session
+CASES_DIR = ROOT / "cases"           # the case database's files: case_database.sqlite3 (SQLite) and chroma/ (ChromaDB),
+                                     # written by core/case_store.py; a committed database.json seeds them the first time

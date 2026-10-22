@@ -11,15 +11,18 @@ What the page does, top to bottom:
      says the document covers), then each case is embedded (one embeddings request
      per 48 cases). Cases saved by version 1.x (chapter 25 labels only) can be
      relabelled by their names, with no AI
-  C. Save and load — download the database as a JSON file, load it again later,
-     or commit it to the repository as cases/database.json so that every user starts with it
+  C. Saved in the app's files — every change is written to cases/case_database.sqlite3
+     (SQLite: the cases and their embeddings) and the ChromaDB collection in
+     cases/chroma/ (core/case_store.py), and loaded again when the app starts; the
+     JSON download/upload is a portable copy
   D. The cases — a table to check and correct the labels and figures, untick a case
      to leave it out, and read any case word for word
 
-The database belongs to this browser session (st.session_state.case_db). The
-estimate page gives the most similar cases (cosine similarity) to the
-current-practice analysis, the proposal and the audit, as comparable cases only:
-the Manual is the only source of law.
+While a session runs the database is held in st.session_state.case_db (saved by
+case_db_changed after each change). The estimate page gives the most similar cases
+(cosine similarity, from the ChromaDB collection) to the current-practice analysis,
+the proposal and the audit, as comparable cases only: the Manual is the only source
+of law.
 """
 
 from __future__ import annotations
@@ -31,6 +34,7 @@ import math
 import pandas as pd
 import streamlit as st
 
+from core.case_store import CHROMA_DIR, SQLITE_FILE, CaseStore, collection_name
 from app_pages.common import (case_db_changed, get_case_db, get_committed_case_db, get_kb, has_key, make_llm,
                               show_case)
 from app_pages.theme import hero
@@ -258,12 +262,24 @@ def load_saved():
 
 
 with st.container(border=True):
-    st.subheader("Save and load")
-    st.caption("The database is kept for this browser session only: reloading the page or closing the tab loses "
-               "it. Download it to keep it, and load it again later. To give everyone who opens the app (e.g. your "
-               "marker) the same database, commit the downloaded file to your repository as `cases/database.json`. "
-               "Case summaries published by the Judicial College are its material: check its terms of use before "
-               "putting them in a public repository.")
+    st.subheader("Saved in the app's files")
+    info = CaseStore().info()
+    if info["cases"]:
+        st.markdown(f"**`cases/{SQLITE_FILE}`** (SQLite): {info['cases']} case(s), {info['vectors']} with embeddings, "
+                    f"saved {info['saved']} · **`cases/{CHROMA_DIR}/`** (ChromaDB collection `{collection_name()}`): "
+                    + (f"{info['chroma']} embedding(s), searched by cosine similarity." if not info["chroma_error"]
+                       else f"unavailable ({info['chroma_error']}) — the cases are ranked with NumPy instead, the "
+                            "same cosine similarity."))
+    else:
+        st.markdown(f"Nothing saved yet. Every change on this page is written to **`cases/{SQLITE_FILE}`** (SQLite, "
+                    f"the cases and their embeddings) and to the ChromaDB collection in **`cases/{CHROMA_DIR}/`** "
+                    "(the embeddings, searched by cosine similarity), and loaded again when the app starts.")
+    st.caption("The files belong to the server the app runs on and are shared by everyone using it. On Streamlit "
+               "Community Cloud they last until the app is rebooted or redeployed: to keep the database for good "
+               f"(and to give your marker the same cases), commit `cases/{SQLITE_FILE}` to your repository "
+               f"(`cases/{CHROMA_DIR}/` is rebuilt from it). The JSON download below is a portable copy you can load "
+               "into any copy of the app. Case summaries published by the Judicial College are its material: check "
+               "its terms of use before putting them in a public repository.")
     left, right = st.columns(2)
     discard_ok = st.session_state.get("cdb_discard_ok", False)
     with left:

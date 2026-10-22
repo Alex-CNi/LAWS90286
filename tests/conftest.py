@@ -9,6 +9,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from core import config  # noqa: E402
 from core.kb import KnowledgeBase  # noqa: E402
 from core.retrieval import Retriever, build_index  # noqa: E402
 from tests.fake_openai import fake_embed_batch  # noqa: E402
@@ -27,3 +28,13 @@ def fake_index(kb):
 @pytest.fixture(scope="session")
 def retriever(kb, fake_index):
     return Retriever(kb, fake_index)
+
+
+@pytest.fixture(autouse=True)
+def isolated_case_store(tmp_path, monkeypatch):
+    """Every test gets its own cases/ folder: the app saves the case database to config.CASES_DIR
+    (core/case_store.py), and the repository's folder must never be written by a test."""
+    folder = tmp_path / "cases"
+    folder.mkdir()
+    monkeypatch.setattr(config, "CASES_DIR", folder)
+    return folder

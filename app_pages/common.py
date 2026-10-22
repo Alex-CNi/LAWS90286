@@ -3,9 +3,12 @@ app_pages/common.py — HELPERS SHARED BY THE PAGES.
 
   get_kb(), get_retriever()   load the knowledge base and search index once for
                               all users (public data, no secrets)
-  get_case_db()               THIS user's case database (comparable cases), kept in
-                              st.session_state; it starts as a copy of the database
-                              committed to the repository (cases/database.json), if any
+  get_case_db()               the case database (comparable cases): loaded from the app's files
+                              (cases/case_database.sqlite3 + the ChromaDB collection cases/chroma,
+                              core/case_store.py) when a session starts — or, the first time, from
+                              a database.json committed to the repository — and held in
+                              st.session_state while the session runs
+  case_db_changed()           call after any change: saves the database to those files
   model_settings_sidebar()    the "Model settings" box in the sidebar
   make_llm()                  an LLM object built from THIS user's key and settings
   show_*()                    small display helpers (check results, citations,
@@ -19,6 +22,7 @@ import uuid
 import streamlit as st
 
 from core import config
+from core.case_store import CaseStore, StoreError
 from core.cases import POLICY, CaseDB, CaseRecord, Comparables, load_committed
 from core.kb import KnowledgeBase
 from core.llm import LLM
@@ -61,22 +65,51 @@ def get_committed_case_db() -> tuple[CaseDB | None, str]:
 
 
 def get_case_db() -> CaseDB:
-    """This user's case database (in st.session_state: it lasts until the page is reloaded or the tab is closed)."""
+    """The case database. A session starts from what is saved in the app's files (core/case_store.py); if nothing
+    has been saved yet, from a copy of the database committed as cases/database.json (which is then saved to the
+    files, so later sessions start from them); otherwise empty."""
     if "case_db" not in st.session_state:
-        base, error = get_committed_case_db()
-        if error:
-            st.session_state.cdb_notice = ("error", error)
-        db = base.copy() if base else CaseDB()
-        if base:
-            db.origin = f"the repository's {base.origin}"
+        store, db, damaged = CaseStore(), None, False
+        try:
+            db = store.load()
+        except StoreError as exc:
+            damaged = True
+            st.session_state.cdb_notice = ("error", f"{exc} The session starts without the saved cases; the file is "
+                                                    "left as it is until you change the database here (copy it first "
+                                                    "if you want to recover it).")
+        if db is None:
+            base, error = get_committed_case_db()
+            if error:
+                st.session_state.cdb_notice = ("error", error)
+            db = base.copy() if base else CaseDB()
+            if base:
+                db.origin = f"the repository's {base.origin}"
+                if not damaged:
+                    save_case_db(db)                      # seeds the files the first time
         st.session_state.case_db = db
         st.session_state.case_db_version = 0
     return st.session_state.case_db
 
 
+def save_case_db(db: CaseDB | None = None) -> bool:
+    """Write the database to the app's files (SQLite + the ChromaDB collection). A failure is shown on the Case
+    database page, never raised: the cases stay in the session."""
+    db = db if db is not None else st.session_state.get("case_db")
+    if db is None:
+        return False
+    try:
+        CaseStore().save(db)
+        return True
+    except StoreError as exc:
+        st.session_state.cdb_notice = ("error", f"{exc} The cases are kept for this session: download them.")
+        return False
+
+
 def case_db_changed() -> None:
-    """Call after adding, loading or clearing cases (resets the case table's editing state)."""
+    """Call after adding, loading, editing or clearing cases: saves the database to the app's files and resets
+    the case table's editing state."""
     st.session_state.case_db_version = st.session_state.get("case_db_version", 0) + 1
+    save_case_db()
 
 
 # ─────────────────────────────────────────────────────────────────────────────

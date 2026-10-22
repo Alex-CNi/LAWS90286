@@ -1186,6 +1186,9 @@ class CaseDB:
     vectors: dict[str, np.ndarray] = field(default_factory=dict)    # case id -> unit vector
     origin: str = ""                                                 # where it came from, for the status line
     last_number: int = 0                                             # highest id number ever given (ids never reused)
+    # Set by core/case_store.py once the database is on disk: (query vector, case ids) -> {id: cosine similarity}
+    # from the persistent ChromaDB collection, or None when it cannot answer (NumPy is used then).
+    search: object = field(default=None, repr=False, compare=False)
 
     # ── adding ──
     def next_number(self) -> int:
@@ -1322,7 +1325,7 @@ class CaseDB:
     def copy(self) -> "CaseDB":
         return CaseDB(cases=[CaseRecord.from_dict(c.to_dict()) for c in self.cases],
                       vectors={k: v.copy() for k, v in self.vectors.items()}, origin=self.origin,
-                      last_number=self.last_number)
+                      last_number=self.last_number, search=self.search)
 
 
 def load_committed(path=None) -> CaseDB | None:
@@ -1453,8 +1456,12 @@ def select_comparables(db: CaseDB | None, offence_id: str, query_vector=None, qu
     if query_vector is not None and db.has_vectors():
         q = np.asarray(query_vector, dtype=np.float32)
         q = q / (float(np.linalg.norm(q)) or 1.0)
-        scores = {c.id: float(np.dot(db.vectors[c.id], q)) for c in cases}
-        out.method = "cosine similarity of the embeddings"
+        scores = db.search(q, [c.id for c in cases]) if db.search else None     # the ChromaDB collection on disk
+        if scores and len(scores) == len(cases):
+            out.method = "cosine similarity of the embeddings (ChromaDB collection, cases/chroma)"
+        else:
+            scores = {c.id: float(np.dot(db.vectors[c.id], q)) for c in cases}
+            out.method = "cosine similarity of the embeddings (NumPy)"
     else:
         scores = keyword_scores(cases, query_text)
         out.method = "keyword ranking (BM25), because " + (

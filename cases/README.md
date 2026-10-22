@@ -1,19 +1,20 @@
-# cases/ — the case database committed with the app (optional)
+# cases/ — where the case database lives
 
-If a file `cases/database.json` is here, every user of the app starts with its cases on the **Case database**
-page, and the estimate page uses them as comparable cases (yardsticks of current sentencing practice — never a
-source of law; the Manual is the only source of law).
+The cases chunked on the **Case database** page are saved here automatically (`core/case_store.py`), after
+every change, and loaded again when the app starts:
 
-To make one:
+| File | What it holds | Commit it? |
+|---|---|---|
+| `case_database.sqlite3` | SQLite: every case (its text word for word, labels, figures) and its embedding (text-embedding-3-large, 1024 dimensions) | **Yes** — this is the record of the database |
+| `chroma/` | ChromaDB (persistent client): the same embeddings in a collection searched by cosine similarity when the estimate picks the most similar cases | No — rebuilt from the SQLite file whenever it is missing or out of step (`.gitignore` leaves it out) |
+| `database.json` | A JSON copy downloaded from the page (optional). Loaded only the first time, when no SQLite file exists yet, to seed it | Optional |
 
-1. Run the app, open **Case database**, upload your documents of case summaries (for example the Judicial
-   College's *Sentencing Manual case summaries*, downloaded as Word, PDF, text or a saved web page) and press
-   **Chunk and label the cases with AI**. Check the labels and figures in the table.
-2. Press **Download the database (.json)**.
-3. Save the file here as `cases/database.json`, commit and push. The deployed app loads it on its next start.
+The files hold no API key. They belong to the server the app runs on and are shared by everyone using it. On
+Streamlit Community Cloud files written while the app runs last until it is rebooted or redeployed, so to keep the
+database for good — and to give your marker the same cases — commit `cases/case_database.sqlite3` and push.
 
-The file holds each case's text (word for word from your document), its labels and figures, and its embedding
-(text-embedding-3-large, 1024 dimensions). It contains no API key.
+If ChromaDB cannot be imported on the server, the page says so and the cases are ranked with NumPy (the same cosine
+similarity, computed exactly); nothing is lost.
 
 Case summaries published by the Judicial College of Victoria are its material: check its terms of use before
 committing them to a public repository (a private repository shared with your marker avoids publishing them).

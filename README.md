@@ -16,6 +16,11 @@ Manual (4th ed, Judicial College of Victoria, version published 21 September 202
 > with any register offence. Ten new test cases (§2) cover one family of schemes each. Still outside: the Magistrates'
 > Court, the offender-status schemes and several charges in one run (§7).
 >
+> **Version 2.1:** the case database is **saved in the app's files** — `cases/case_database.sqlite3` (SQLite: the
+> cases and their embeddings) and a persistent **ChromaDB** collection in `cases/chroma/`, searched by cosine
+> similarity for the estimate — after every change, and loaded again when the app starts (§3, `cases/README.md`).
+> Before, it lived in the browser session only.
+>
 > **Version 1.3:** the result comes first, in a **result card**: the formulated sentence in large type, the indicative
 > range, the framework and the results of the checks. With a case database, the card also shows **where the estimate
 > sits among the most similar cases** (each case's sentence for this offence, on a scale of months with the range) and
@@ -219,11 +224,18 @@ accords with current practices (VSM 5.2.9.3.2), but “It will not be possible t
 offence when there are only a small number of sentences” and the range “should not be defined by only a few select
 cases” (VSM 5.2.9.3.1); there is no single correct sentence (VSM 2.1). The report repeats the figure in sections 1 and 9.
 
-**Keeping it** — the database is kept for your browser session only: reloading the page or closing the tab loses it.
-**Download the database (.json)** to keep it and load it again later (cases made with another embedding model are
-embedded again on loading, and every case's figures are checked again), or commit the file to the repository as `cases/database.json` so that every user (and the
-marker) starts with it (see `cases/README.md`). Case summaries published by the Judicial College are its material:
-check its terms of use before committing them to a public repository.
+**Keeping it** — every change on the page is saved in the app's files (`core/case_store.py`): the cases and their
+embeddings in **`cases/case_database.sqlite3`** (SQLite) and the embeddings in a persistent **ChromaDB** collection in
+`cases/chroma/`, which the estimate searches by cosine similarity (if ChromaDB cannot be imported on the server, the
+page says so and NumPy computes the same similarity). The app loads them again when it starts, so the cases survive a
+page reload, a closed tab and a restart of the app on your own machine. The files are the server's and are shared by
+everyone using that server; on Streamlit Community Cloud they last until the app is rebooted or redeployed, so
+**commit `cases/case_database.sqlite3`** to keep the database for good and give every user (and the marker) the same
+cases (`cases/chroma/` is rebuilt from it and is in `.gitignore`). **Download the database (.json)** is a portable
+copy to load into another copy of the app (cases made with another embedding model are embedded again on loading,
+and every case's figures are checked again); a committed `cases/database.json` seeds the files the first time the
+app starts without them. Case summaries published by the Judicial College are its material: check its terms of use
+before committing them to a public repository.
 
 **Try it** — upload `tests/fixtures/invented_case_summaries.txt` (11 invented cases: 1 AI call), then run test case 1:
 Step 4's *Current practice and comparable material* tab lists the comparable cases, and the report has a section on
@@ -246,8 +258,9 @@ them. Clear the database afterwards — those cases are made up.
 
 The class tools: if-then control in code (Lab 1: framework, gates, hard checks); retrieval with a database, a loop and
 reflection (Lab 2: vector search with ChromaDB, or NumPy, over the index built by `scripts/build_index.py` —
-keyword ranking until it is built — the audit and the revision loop); Pydantic
-structured outputs, cosine similarity (the knowledge base and the case database) and quote verification (Day 3 code).
+keyword ranking until it is built — and the persistent ChromaDB collection of case embeddings in `cases/chroma/`; the
+audit and the revision loop); Pydantic structured outputs, cosine similarity (the knowledge base and the case database)
+and quote verification (Day 3 code).
 The chunking calls on the Case database page are not part of any run and are not counted in a run's AI calls.
 
 ---
@@ -277,7 +290,8 @@ The chunking calls on the Case database page are not part of any run and are not
    *Share* settings make the app public (an app from a private repository is private by default) or invite the
    teacher by email.
 5. **Case database (optional):** to give every user the same comparable cases, build the database on the Case
-   database page, download it and commit it as `cases/database.json` (see §3 and `cases/README.md`).
+   database page (it is saved to `cases/case_database.sqlite3` as you go) and commit that file (see §3 and
+   `cases/README.md`).
 6. **Tests:** `pip install pytest && pytest` (the OpenAI service is simulated, so no key is needed).
 7. Do not change the repository after submission (the brief); the package versions in `requirements.txt` are pinned
    and the model for each step can be changed in the sidebar if a model becomes unavailable.
@@ -293,7 +307,7 @@ in practice (ChromaDB's search is approximate).
 - [ ] the three test cases run once on the deployed app with a real key, and one of test cases 4–13 per family you
       rely on (the tests' simulated OpenAI service cannot catch a schema the API rejects or a model that misreads an
       offence code)
-- [ ] (optional) `cases/database.json` committed, if the marker should start with your case database
+- [ ] (optional) `cases/case_database.sqlite3` committed, if the marker should start with your case database
 - [ ] the teacher can open the repository and the app (sharing settings)
 - [ ] no further commits after submission
 

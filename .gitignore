@@ -12,3 +12,7 @@ venv/
 .DS_Store
 .idea/
 .vscode/
+
+# The case database's ChromaDB collection (cases/chroma/) is rebuilt from cases/case_database.sqlite3,
+# which is the file to commit.
+cases/chroma/

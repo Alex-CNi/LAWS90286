@@ -68,7 +68,9 @@ of the same decision) go to
 the current-practice analysis, the proposal and the audit. They are **comparable cases only** — yardsticks of current
 sentencing practice, used as the Manual says comparable cases are used — never a source of law, and the report lists
 them with the ones the reasoning relied on. The AI's figures for each case are checked against the case's own text;
-anything that does not match is shown for you to check, never silently changed.
+anything that does not match is shown for you to check, never silently changed. The database is saved in the app's
+files after every change (`cases/case_database.sqlite3`, SQLite, and a ChromaDB collection of the embeddings in
+`cases/chroma/`) and loaded again when the app starts; the files belong to the server the app runs on.
 
 ### The result card and the share of similar cases within the range
 The estimate is shown first in a result card: the formulated sentence in large type, the indicative range, the
