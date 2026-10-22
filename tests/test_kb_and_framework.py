@@ -8,7 +8,7 @@ from core import config
 from core.facts import CaseInput, ConfirmedFacts, validate
 from core.framework import build_framework
 
-S15A, S15B, S16, S17, S18I, S18R = config.IN_SCOPE_OFFENCES
+S15A, S15B, S16, S17, S18I, S18R = config.CAUSING_INJURY_OFFENCES
 
 
 def fw_for(kb, oid, d=date(2024, 5, 1), prot="no", knew="no", age=25, accessory="no"):

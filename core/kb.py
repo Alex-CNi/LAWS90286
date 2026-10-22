@@ -73,6 +73,23 @@ def _norm(text: str) -> str:
     return re.sub(r"\s+", " ", text or "").strip()
 
 
+# The penalty tables the Manual's text holds only as verbatim text (penalty_scale.json "historic_tables";
+# flag.historic_tables_unstructured): (table, first day, last day, the register sections whose offences it
+# covers). The user must confirm the maximum from the table (audit.offence_date_and_historic_offending).
+SEXUAL_GROUPS = ("24.1.1", "24.1.2", "24.1.3", "24.1.4", "24.1.5")
+HISTORIC_TABLES = [
+    ("24.1.6.1", "1991-08-05", "2017-06-30", ("24.1.1",)),     # sexual offences against adults
+    ("24.1.6.2", "1991-08-05", "2017-06-30", ("24.1.2",)),     # sexual offences against or involving children
+    ("24.1.6.3", "1996-01-01", "2017-06-30", ("24.1.3",)),     # child abuse material offences
+    ("24.1.6.4", "1991-08-05", "2017-06-30", ("24.1.4",)),     # sexual offences against the cognitively impaired
+    ("24.1.6.5", "2004-05-19", "2017-06-30", ("24.1.5",)),     # sexual servitude offences
+    ("24.1.6.6", "1981-03-01", "1991-08-04", SEXUAL_GROUPS),   # sexual offences
+    ("24.1.6.7", "1959-04-01", "1981-02-28", SEXUAL_GROUPS),   # sexual offences
+]
+SEXUAL_TABLES_FROM, SEXUAL_TABLES_TO = "1959-04-01", "2017-06-30"
+OHS_1985_TABLE, OHS_2004_FROM = "31.1.2", "2005-07-01"      # repealed Occupational Health and Safety Act 1985
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # The knowledge base
 # ─────────────────────────────────────────────────────────────────────────────
@@ -180,13 +197,97 @@ class KnowledgeBase:
     def offence(self, offence_id: str) -> dict:
         return self.offences[offence_id]
 
+    def offence_chapter(self, offence_id: str) -> str:
+        """The Part E chapter the offence's register row sits in, e.g. "27"."""
+        return str(self.offences[offence_id].get("chapter") or "")
+
+    def offence_aliases(self, offence_id: str) -> list[str]:
+        """The offence's id and the ids of the same offence listed again in another table (also_listed_as:
+        conspiracy to defraud is in chapters 27 and 32)."""
+        return [offence_id] + [a for a in self.offences[offence_id].get("also_listed_as") or [] if a in self.offences]
+
+    def offence_chapters(self, offence_id: str) -> set[str]:
+        """Every Part E chapter the offence is listed in (its own and its aliases')."""
+        return {self.offence_chapter(a) for a in self.offence_aliases(offence_id)}
+
+    def chapter_title(self, chapter: str) -> str:
+        """'27 — Property Offences' (from the Manual's table of contents)."""
+        for entry in self.toc:
+            if str(entry.get("id")) == str(chapter):
+                return f"{chapter} — {entry.get('title')}"
+        return str(chapter)
+
+    def historic_tables(self, offence_id: str, start: str, end: str | None = None) -> tuple[str, list[str]] | None:
+        """For offending in a period whose penalty table the Manual holds only as text: ("table", [sections]);
+        sexual offending before 1 April 1959 (no table): ("none_before_1959", []); a sexual offence in the
+        1959–2017 window that no table covers: ("no_table", []). None if no historic table applies."""
+        row = self.offences[offence_id]
+        dates = [start] + ([end] if end else [])
+        chapter, group = str(row.get("chapter")), ".".join(str(row.get("section") or "").split(".")[:3])
+        if chapter == "31":
+            return ("table", [OHS_1985_TABLE]) if any(x < OHS_2004_FROM for x in dates) else None
+        if chapter != "24":
+            return None
+        if any(x < SEXUAL_TABLES_FROM for x in dates):
+            return "none_before_1959", []
+        window = [x for x in dates if x <= SEXUAL_TABLES_TO]
+        if not window:
+            return None
+        hits = sorted({t for t, first, last, groups in HISTORIC_TABLES
+                       if group in groups and any(first <= x <= last for x in window)})
+        return ("table", hits) if hits else ("no_table", [])
+
+    def section_text(self, section: str) -> str:
+        """The Manual's text of one section (its passages in order), e.g. a historic penalty table."""
+        parts = sorted((cid for cid, ch in self.chunks.items() if str(ch.get("section")) == str(section)),
+                       key=lambda c: int(c.split("#")[-1]) if c.split("#")[-1].isdigit() else 0)
+        return "\n\n".join(self.chunks[c].get("text") or "" for c in parts)
+
+    def charge_label(self, offence_id: str) -> str:
+        """The charge box's label, name first so typing a word finds it: '27 · Home invasion — Crimes Act 1958 s 77A'."""
+        o = self.offences[offence_id]
+        act = o.get("act") or ""
+        act = "Crimes Act 1958" if act.lower().startswith("crimes") else act
+        prov = o.get("provision_norm") or o.get("provision") or ""
+        where = " ".join(x for x in (act, prov) if x)
+        return f"{o.get('chapter')} · {o['offence']}" + (f" — {where}" if where else "")
+
+    def offence_codes(self) -> dict[str, str]:
+        """Short codes for the simple input's sorting call ("27-05" -> offence id), so the call is not shown 335
+        long ids. Built from config.IN_SCOPE_OFFENCES, numbered within each chapter in register order."""
+        codes: dict[str, str] = {}
+        count: dict[str, int] = {}
+        for oid in config.IN_SCOPE_OFFENCES:
+            ch = self.offence_chapter(oid)
+            count[ch] = count.get(ch, 0) + 1
+            codes[f"{ch}-{count[ch]:02d}"] = oid
+        return codes
+
+    def offence_code_list(self, chapters=None) -> tuple[str, dict[str, str]]:
+        """The offence codes as an AI call is shown them, under chapter headings ("### Chapter 27 — Property
+        Offences", then "27-06: Crimes Act 1958 s 75A — Armed robbery"), and code -> offence id. chapters: only the
+        offences listed in those chapters (the case database's chunking); default every offence. Used by the simple
+        input's sorting call and the chunking calls: all 335 offences as "id: name" lines would be about 43,000
+        characters on every call."""
+        wanted = {str(c) for c in chapters} if chapters else None
+        codes = {code: oid for code, oid in self.offence_codes().items()
+                 if wanted is None or self.offence_chapters(oid) & wanted}
+        lines, chapter = [], None
+        for code, oid in codes.items():
+            if self.offence_chapter(oid) != chapter:
+                chapter = self.offence_chapter(oid)
+                lines.append(f"### Chapter {self.chapter_title(chapter)}")
+            lines.append(f"{code}: {self.offence_label(oid)}")
+        return "\n".join(lines), codes
+
     def offence_label(self, offence_id: str) -> str:
         """'Crimes Act 1958 s 17 — Recklessly causing serious injury'."""
         o = self.offences[offence_id]
         act = o.get("act") or ""
         act = "Crimes Act 1958" if act.lower().startswith("crimes") else act
         prov = o.get("provision_norm") or o.get("provision") or ""
-        return f"{act} {prov} — {o['offence']}".strip()
+        where = " ".join(x for x in (act, prov) if x)
+        return f"{where} — {o['offence']}" if where else o["offence"]
 
     # ── 3. Citations ────────────────────────────────────────────────────────
     def support_refs(self, item_id: str) -> list[dict]:
@@ -247,32 +348,35 @@ class KnowledgeBase:
             if not set(m.get("stage") or []) & set(stages):
                 continue
             linked = set(m.get("offence_ids") or [])
-            if linked and offence_id not in linked:
+            if linked and not linked & set(self.offence_aliases(offence_id)):
                 continue
-            if not linked and self._other_offence_chapter_only(m):
+            if not linked and self._other_offence_chapter_only(m, self.offence_chapters(offence_id)):
                 continue
             out.append(item_id)
         return out
 
     @staticmethod
-    def _other_offence_chapter_only(meta_row: dict) -> bool:
+    def _other_offence_chapter_only(meta_row: dict, chapters_of_offence) -> bool:
         """True if every section the item cites is in a Part E (offence)
-        chapter other than the in-scope chapter(s)."""
+        chapter other than the offence's own chapter(s) (e.g. occupational
+        health and safety guidance never reaches an assault case)."""
+        own = {chapters_of_offence} if isinstance(chapters_of_offence, str) else set(chapters_of_offence)
         chapters = {str(s).split(".")[0] for s in meta_row.get("sections") or [] if s}
         if not chapters:
             return False
-        return chapters <= set(config.PART_E_CHAPTERS) and not chapters & set(config.OFFENCE_CHAPTERS)
+        return chapters <= set(config.PART_E_CHAPTERS) and not chapters & own
 
     def audit_items(self, check: str) -> list[str]:
         """Audit item ids by check type: 'hard', 'gate' or 'critic'."""
         return [i for i, m in self.meta.items() if m["file"] == "audit" and m["check"] == check]
 
     def flags_for_offence(self, offence_id: str) -> list[str]:
+        ids = set(self.offence_aliases(offence_id)) if offence_id in self.offences else {offence_id}
         out = []
         for item_id, item in self.items.items():
             if item.get("_file") != "flags" or item.get("_parent"):
                 continue
-            if offence_id in (item.get("offence_ids") or []) or offence_id in (item.get("offence_ids_all") or []):
+            if ids & (set(item.get("offence_ids") or []) | set(item.get("offence_ids_all") or [])):
                 out.append(item_id)
         return out
 
@@ -348,15 +452,16 @@ class KnowledgeBase:
             h.update(self.embed_text("chunk", cid).encode())
         return h.hexdigest()[:16]
 
-    def comparable_passages(self) -> list[str]:
-        """Manual passages searched for 'most similar' material: the offence
-        chapter(s) plus the general current-sentencing-practice sections."""
+    def comparable_passages(self, chapters) -> list[str]:
+        """Manual passages searched for 'most similar' material: the offence's
+        own chapter(s) plus the general current-sentencing-practice sections."""
+        own = {str(chapters)} if isinstance(chapters, (str, int)) else {str(c) for c in chapters}
         out = []
         for cid, ch in self.chunks.items():
             if ch.get("jurisdiction") == "Cth":
                 continue
             section = str(ch.get("section") or "")
-            if str(ch.get("chapter")) in config.OFFENCE_CHAPTERS or \
+            if str(ch.get("chapter")) in own or \
                     any(section == s or section.startswith(s + ".") for s in config.COMPARABLES_GENERAL_SECTIONS):
                 out.append(cid)
         return out

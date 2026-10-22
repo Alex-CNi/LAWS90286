@@ -25,9 +25,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from core import config
-
 YesNoUnknown = Literal["yes", "no", "unknown"]
+ManslaughterCircumstance = Literal["gross_violence", "single_punch", "neither", "unknown"]
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Facts extraction (AI call 1)
@@ -71,6 +70,18 @@ class SuggestedValues(BaseModel):
     cooperation: Literal["none", "admissions_only", "past_assistance", "undertaking", "unknown"]
     prior_convictions: Literal["none", "some", "relevant_or_significant", "unknown"]
     arising_from_driving: YesNoUnknown
+    # Charge-specific (used only for the charges whose statutory scheme turns on them; "unknown" for any other charge)
+    manslaughter_circumstance: ManslaughterCircumstance = Field(
+        description="Manslaughter only: gross violence or a single punch or strike, as the material establishes it")
+    prosecution_notice: YesNoUnknown = Field(
+        description="Manslaughter only: the prosecution gave notice that it will apply for the mandatory minimum")
+    official_injured: YesNoUnknown = Field(
+        description="Crimes Act ss 317AC/317AD only: the protected official was injured in the commission of the offence")
+    category_condition_met: YesNoUnknown = Field(
+        description="The category condition asked in the case details (e.g. armed robbery: the offender had a firearm, "
+                    "a victim suffered injury as a direct result, or the offence was committed in company)")
+    conditional_condition_met: YesNoUnknown = Field(
+        description="The condition of a higher maximum asked in the case details (e.g. within 500 metres of a school)")
 
 
 class FactsExtraction(BaseModel):
@@ -113,7 +124,7 @@ class StageAnalysis(BaseModel):
 # 3. Proposed sentence (AI call 6, and the revision call)
 # ─────────────────────────────────────────────────────────────────────────────
 DispositionType = Literal["imprisonment", "imprisonment_and_cco", "cco", "mtmo", "fine",
-                          "adjourned_undertaking", "discharge", "dismissal"]
+                          "adjourned_undertaking", "discharge", "dismissal", "life_imprisonment"]
 
 CCOConditionKind = Literal[
     "unpaid_community_work", "treatment_and_rehabilitation", "supervision", "non_association",
@@ -206,10 +217,18 @@ class ReasonParagraph(BaseModel):
 
 class Proposal(BaseModel):
     disposition_type: DispositionType
-    term_months: Optional[int] = Field(description="Imprisonment term in months (combination: the imprisonment part)")
+    term_months: Optional[int] = Field(description="Imprisonment term in months (combination: the imprisonment part); "
+                                                   "null for life imprisonment")
     npp_months: Optional[int] = Field(description="Non-parole period in months, or null")
-    npp_reason: Optional[str] = Field(description="Why no non-parole period is fixed for a term of 24 months or more, "
-                                                  "or why the non-parole period is unusual")
+    npp_reason: Optional[str] = Field(description="Why no non-parole period is fixed for a term of 24 months or more "
+                                                  "(or for life imprisonment), or why the non-parole period is unusual")
+    standard_sentence_statement: str = Field(
+        description="Standard sentence offences only (the framework says whether the scheme applies): how the sentence "
+                    "relates to the standard sentence, naming the facts, matters and circumstances relied on; empty "
+                    "otherwise")
+    npp_interests_of_justice_reason: Optional[str] = Field(
+        description="Standard sentence offences only: why a non-parole period below the s 11A(4) minimum is in the "
+                    "interests of justice; null otherwise")
     cco: Optional[CCOTerms]
     fine_penalty_units: Optional[int]
     undertaking_months: Optional[int]
@@ -253,7 +272,7 @@ Plea = Literal["guilty_early", "guilty", "guilty_late", "not_guilty", "mixed", "
 
 class ChunkOffence(BaseModel):
     name: str = Field(description="The offence as written, without the sentence")
-    offence_id: str = Field(description="One of the offence ids listed in the input, or \"other\"")
+    offence_id: str = Field(description="One of the offence codes listed in the input (e.g. \"27-05\"), or \"other\"")
     sentence_text: str = Field(description="The individual sentence for this offence as written; empty if none given")
     sentence_months: Optional[float] = Field(description="That sentence in months (years × 12); null if none, "
                                                          "not imprisonment, or life")
@@ -266,7 +285,7 @@ class ChunkedCase(BaseModel):
     citation: str = Field(description="The case name and citation exactly as written")
     court: Literal["Court of Appeal", "County Court", "Supreme Court", "unknown"]
     year: Optional[int]
-    principal_offence_id: str = Field(description="The offence the case is listed under (one of the ids, or \"other\")")
+    principal_offence_id: str = Field(description="The offence the case is listed under (one of the codes, or \"other\")")
     principal_offence: str = Field(description="The principal offence's name as written")
     offences: list[ChunkOffence] = Field(description="Every offence charged, in the order given")
     head_sentence_text: str = Field(description="The head sentence / orders as written")
@@ -285,7 +304,9 @@ class ChunkResult(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 # 6. Sorting a plain description into the form's questions (simple input)
 # ─────────────────────────────────────────────────────────────────────────────
-OffenceChoice = Literal[tuple(config.IN_SCOPE_OFFENCES) + ("other", "unclear")]
+# The charge is a short code from the list in the input (e.g. "27-05"), checked in code (core/facts.py,
+# sort_description): a 335-value enum of long ids would be costly and risks the API's limits on enum size.
+OffenceChoice = str
 
 
 class FieldQuote(BaseModel):
@@ -295,8 +316,9 @@ class FieldQuote(BaseModel):
 
 class SortedCase(BaseModel):
     case_name: str = Field(description="The case name if the description gives one (e.g. \"DPP v Smith\"), else empty")
-    offence_id: OffenceChoice = Field(description="The charge, as one of the listed offence ids; \"other\" for any "
-                                                  "other offence; \"unclear\" if the description does not show it")
+    offence_id: OffenceChoice = Field(description="The charge, as one of the listed offence codes (e.g. \"25-04\"); "
+                                                  "\"other\" for an offence not in the list; \"unclear\" if the "
+                                                  "description does not show it")
     offence_as_described: str = Field(description="The offence as the description puts it, in a few words")
     court: Literal["County Court", "Supreme Court", "Magistrates' Court", "Children's Court", "unclear"]
     offence_date: str = Field(description="The date of the offence as YYYY-MM-DD; empty unless the exact day is given")
@@ -305,6 +327,9 @@ class SortedCase(BaseModel):
     plea: Literal["guilty", "found_guilty_at_trial", "unclear"] = Field(
         description="guilty = pleaded guilty; found_guilty_at_trial = found guilty after a trial (a verdict)")
     plea_timing: Literal["earliest_opportunity", "after_committal", "late", "not_applicable", "unknown"]
+    offender_type: Literal["natural_person", "body_corporate", "unclear"] = Field(
+        description="body_corporate if the offender is a company or other body corporate (e.g. \"XYZ Pty Ltd\"); "
+                    "natural_person if a person; unclear if the description does not show it")
     age_at_offence: Optional[int]
     age_at_sentence: Optional[int]
     prior_convictions: Literal["none", "some", "relevant_or_significant", "unknown"]
@@ -326,6 +351,19 @@ class SortedCase(BaseModel):
     presentence_report: Literal["available", "ordered", "none", "unknown"]
     cco_consent: YesNoUnknown = Field(description="The offender consents to a community correction order")
     arising_from_driving: YesNoUnknown = Field(description="The offence arose from driving a motor vehicle")
+    manslaughter_circumstance: ManslaughterCircumstance = Field(
+        description="Manslaughter only: committed in circumstances of gross violence, or by a single punch or strike")
+    prosecution_notice: YesNoUnknown = Field(
+        description="Manslaughter only: the prosecution gave notice that it will apply for the mandatory minimum")
+    official_injured: YesNoUnknown = Field(
+        description="Driving offences against an emergency worker, custodial officer or youth justice custodial worker "
+                    "(Crimes Act ss 317AC, 317AD) only: the worker was injured")
+    category_condition_met: YesNoUnknown = Field(
+        description="Armed robbery only: the offender had a firearm, or a victim suffered injury as a direct result, or "
+                    "the offence was committed in company")
+    conditional_condition_met: YesNoUnknown = Field(
+        description="Only for: drug trafficking at the direction of a criminal organisation; trafficking or supplying "
+                    "drugs within 500 metres of a school; affray or violent disorder while wearing a face covering")
     quotes: list[FieldQuote] = Field(description="For each answer that is not unknown/unclear/empty, the words of the "
                                                  "description that show it, copied exactly")
     outside_version_1: list[str] = Field(description="Anything that takes the case outside what the app covers "

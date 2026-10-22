@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from core import config, prompts
 from core.cases import Comparables
 from core.facts import ConfirmedFacts, case_details_text
-from core.framework import Framework
+from core.framework import Framework, flag_applies
 from core.kb import KnowledgeBase
 from core.llm import LLM, CallRecord, LLMError
 from core.retrieval import Retriever
@@ -66,11 +66,15 @@ def all_query_texts(kb: KnowledgeBase, facts: ConfirmedFacts) -> dict[str, str]:
 # 2. Choosing what each stage is shown
 # ─────────────────────────────────────────────────────────────────────────────
 def select_items(kb: KnowledgeBase, retriever: Retriever, stages: list[str], offence_id: str, query,
-                 limit: int, always: list[str] | None = None) -> tuple[list[str], set[str]]:
+                 limit: int, always: list[str] | None = None, case=None) -> tuple[list[str], set[str]]:
     """Items to show: the always-included ones, then the most similar. Returns
-    (ids in order, ids that also get their quotes)."""
+    (ids in order, ids that also get their quotes). With the case, a Manual flag that cannot bear on it (a body
+    corporate's flag for a person, a youth order's for an adult over 21 …: framework.flag_applies) is not shown."""
     candidates = kb.candidates(stages, offence_id)
-    linked = [i for i in candidates if offence_id in (kb.meta[i].get("offence_ids") or [])]
+    if case is not None:
+        candidates = [i for i in candidates if not i.startswith("flag.") or flag_applies(kb, i, case)]
+    aliases = set(kb.offence_aliases(offence_id))
+    linked = [i for i in candidates if aliases & set(kb.meta[i].get("offence_ids") or [])]
     pinned = [i for i in (always or []) if kb.exists(i)] + [i for i in linked if i not in (always or [])]
     rest = [i for i in candidates if i not in pinned]
     ranked = [i for i, _ in retriever.rank("item", query, rest, max(0, limit - len(pinned)))]
@@ -95,13 +99,15 @@ def run_stage(key: str, llm: LLM, kb: KnowledgeBase, retriever: Retriever, facts
               fw: Framework, query, comparables: Comparables | None = None) -> tuple[StageResult, CallRecord | None]:
     spec = prompts.STAGES[key]
     offence_id = facts.case.offence_id
-    item_ids, quotes_for = select_items(kb, retriever, spec["kb_stages"], offence_id, query, config.ITEMS_PER_STAGE)
+    item_ids, quotes_for = select_items(kb, retriever, spec["kb_stages"], offence_id, query, config.ITEMS_PER_STAGE,
+                                        case=facts.case)
     standards = standards_for(kb, spec["kb_stages"])
     result = StageResult(key=key, title=spec["title"], analysis=None, item_ids=item_ids, standards=standards)
 
     passages_text, cases_text, allowed_cases = "", "", set()
     if key == "comparables":
-        ranked = retriever.rank("chunk", query, kb.comparable_passages(), config.PASSAGES_FOR_COMPARABLES)
+        ranked = retriever.rank("chunk", query, kb.comparable_passages(kb.offence_chapters(offence_id)),
+                                config.PASSAGES_FOR_COMPARABLES)
         result.passage_ids = [c for c, _ in ranked]
         result.passage_scores = {c: round(s, 3) for c, s in ranked}
         passages_text = ("\n\n## Most similar Manual passages (cite by id in passage_ids)\n"

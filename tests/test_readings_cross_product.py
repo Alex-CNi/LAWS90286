@@ -46,7 +46,7 @@ def test_merged_readings_match_the_cross_product(kb, seed):
                   victim_protected_worker=rng.choice(YNU), offender_knew_or_reckless=rng.choice(YNU),
                   protected_scheme_confirmed=rng.choice(YNU), accessory_only=rng.choice(YNU),
                   minor_involvement_proved=rng.choice(YNU), mental_impairment_evidence=rng.choice(YNU))
-        oid = rng.choice(config.IN_SCOPE_OFFENCES)
+        oid = rng.choice(config.CAUSING_INJURY_OFFENCES)
         facts, fw = setup(kb, oid, **kw)
         p = _random_proposal(rng)
         row, case = kb.offence(oid), facts.case

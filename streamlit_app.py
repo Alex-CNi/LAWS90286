@@ -2,7 +2,7 @@
 streamlit_app.py — THE ENTRY POINT (Streamlit Cloud runs this file).
 
 On every page load it:
-  1. sets up the page and its colours (app_pages/theme.py, .streamlit/config.toml);
+  1. sets up the page, its look (app_pages/theme.py, .streamlit/config.toml) and the logo (assets/);
   2. draws the sidebar: the course's API Credentials module (api_key.py) and the
      model settings;
   3. runs the page the user chose (app_pages/).
@@ -18,7 +18,8 @@ from app_pages.theme import apply_theme
 from core import config
 
 st.set_page_config(page_title=config.APP_TITLE, page_icon="⚖️", layout="wide")
-apply_theme()                    # the navy gradient behind the pages (colours: .streamlit/config.toml)
+apply_theme()                    # the look: app_pages/theme.py and .streamlit/config.toml
+st.logo(str(config.ROOT / "assets" / "logo.svg"), size="large", icon_image=str(config.ROOT / "assets" / "icon.svg"))
 
 # 1a. Keep the Estimate form's values while another page is open. Streamlit deletes
 #     the value of a widget that is not drawn in a run (e.g. on the About page), and
@@ -38,9 +39,9 @@ model_settings_sidebar()
 
 # 3. Pages
 page = st.navigation([
-    st.Page("app_pages/estimate.py", title="Sentence-After-Lunch.Ai", icon="⚖️", default=True),
-    st.Page("app_pages/cases.py", title="Case database", icon="🗂️"),
-    st.Page("app_pages/knowledge_base.py", title="Knowledge base", icon="📚"),
-    st.Page("app_pages/about.py", title="About and method", icon="ℹ️"),
+    st.Page("app_pages/estimate.py", title="Estimate a sentence", icon=":material/gavel:", default=True),
+    st.Page("app_pages/cases.py", title="Case database", icon=":material/folder_open:"),
+    st.Page("app_pages/knowledge_base.py", title="Knowledge base", icon=":material/menu_book:"),
+    st.Page("app_pages/about.py", title="About and method", icon=":material/info:"),
 ])
 page.run()

@@ -73,7 +73,7 @@ def _random_proposal(rng: random.Random) -> schemas.Proposal:
         plea_reduced_sentence=rng.random() < 0.5)
 
 
-@pytest.mark.parametrize("oid", config.IN_SCOPE_OFFENCES)
+@pytest.mark.parametrize("oid", config.CAUSING_INJURY_OFFENCES)
 def test_an_unconfirmed_scheme_errs_exactly_when_both_readings_err(kb, oid):
     """Errors when the scheme's application is 'unknown' (two readings) iff the
     sentence errs both when it applied ('yes') and when it did not ('no')."""

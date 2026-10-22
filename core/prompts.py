@@ -74,7 +74,12 @@ Do this:
   Magistrates' Court or Children's Court. Empty if none.
 - charge_fit: whether the facts as described fit the selected charge (e.g. an injury that is "serious" for a
   serious-injury offence). The app sentences only for the charge as laid; note any mismatch.
-- suggested: the value the material supports for each listed field; "unknown" when it does not say."""
+- suggested: the value the material supports for each listed field; "unknown" when it does not say. The
+  charge-specific fields (manslaughter_circumstance, prosecution_notice, official_injured, category_condition_met,
+  conditional_condition_met) apply only to the charges their descriptions name (the case details list the
+  questions that apply): answer "unknown" for any other charge. Each of them counts against the offender: give a
+  value other than "unknown" only if the material states it as established (admitted, agreed or found), never if it
+  is alleged, disputed or inferred."""
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. AI calls 2–5 — the four stage analyses
@@ -98,7 +103,7 @@ STAGES = {
 Assess the objective seriousness of the offending and the offender's culpability for it: the nature and
 circumstances of the offence, the harm caused (physical and psychological, and its impact on the victim), intent
 or the degree of recklessness, any weapon and how it was used, planning, persistence, the victim's vulnerability,
-any family violence context, and the factors chapter 25 (Causing injury) identifies for this offence.
+any family violence context, and the factors the Manual's chapter on this offence (Part E) identifies.
 Separate features that are elements of the offence charged (not aggravating) from aggravating features, and do
 not sentence for a more serious offence than the one charged.""",
     },
@@ -122,7 +127,7 @@ custody conditions and any other personal matter in the facts.""",
         "instructions": """STAGE: PURPOSES AND POLICY.
 Assess how the purposes of sentencing (just punishment, denunciation, general and specific deterrence, community
 protection, rehabilitation) apply to this offence and offender and how they should be balanced, including the
-emphasis chapter 25 places on particular purposes for causing injury offences. Then assess the policy
+emphasis the Manual's chapter on this offence places on particular purposes. Then assess the policy
 considerations the facts raise (for example prevalence, delay, hardship to the offender or to others,
 extra-curial punishment, collateral consequences).""",
     },
@@ -165,6 +170,17 @@ The app checks the following in code after you answer; breaching one is an error
 - Non-parole period: a term of 24 months or more needs one (or a stated reason why it is inappropriate); none for
   a term under 12 months; it must be at least 6 months less than the term; none where a term over 12 and under
   24 months is combined with a CCO.
+- Life imprisonment (disposition life_imprisonment, term_months null) only where the framework's maximum is life:
+  fix a non-parole period, or state in npp_reason why none is fixed (life without parole is exceptional); no CCO,
+  and no fine unless the register prints one.
+- Standard sentence scheme (only if the framework says it applies or is unresolved): the standard sentence is a
+  guidepost like the maximum, not a starting point — take it into account, but do not start from it and adjust, do
+  not classify the offending as below or above a mid-range, and do not give it too much weight. State in
+  standard_sentence_statement how the sentence relates to the standard sentence, naming the facts, matters and
+  circumstances relied on. The non-parole period must be at least 30 years for life, 70% of a term over 20 years and
+  60% of a term under 20 years (exactly 20 years: at least 60%), unless that is not in the interests of justice —
+  then say why in npp_interests_of_justice_reason. Only sentences imposed under the scheme are current sentencing
+  practice. For any other offence leave standard_sentence_statement empty and npp_interests_of_justice_reason null.
 - CCO: consent; a pre-sentence report (unless the only condition is unpaid work of under 300 hours); at most
   60 months in the higher courts; in a combination sentence the imprisonment may not exceed 12 months after
   deducting pre-sentence detention; at least one condition from: unpaid community work, treatment and
@@ -173,24 +189,33 @@ The app checks the following in code after you answer; breaching one is an error
   compensation condition; unpaid work at most 600 hours with the hours and the completion period stated; a
   curfew of 2–12 hours a day for at most 6 months; electronic monitoring only to monitor a curfew or a place or
   area exclusion. A mandatory treatment and monitoring order (mtmo) is open only on a protected-official charge
-  (ss 16–18, as the framework applies it) where a special reason is found, and needs a judicial monitoring
-  condition and a treatment and rehabilitation or justice plan condition; otherwise propose a CCO.
+  (ss 16–18, or ss 317AC/317AD with the official injured, as the framework applies it) where a special reason is
+  found, and needs a judicial monitoring condition and a treatment and rehabilitation or justice plan condition;
+  otherwise propose a CCO.
 - Imprisonment requires a recorded conviction. For a CCO, fine or adjourned undertaking say whether a conviction
   is recorded. A dismissal is without conviction; a discharge needs a conviction.
 - Section 6AAA: if the guilty plea produced a less severe sentence and the sentence is imprisonment, a CCO of 24
   months or more, or a fine over 10 penalty units, state the notional sentence that would have been imposed but
   for the plea (type, term and notional non-parole period if one is fixed). It must be more severe than the
   actual sentence.
-- Mandatory ancillary orders whose conditions are met (for example an alcohol exclusion order) must be listed.
+- Mandatory ancillary orders whose conditions are met must be listed: an alcohol exclusion order; and a licence
+  order where the framework says one is mandatory, at or above its minimum and in the form the licence held
+  requires (a Victorian licence: licence_cancellation_and_disqualification; an interstate or overseas licence:
+  licence_disqualification_from_driving; none: licence_disqualification_from_obtaining; unknown: say so and give
+  the order in the alternative).
+- A body corporate (if the framework says the offender is one): no imprisonment, CCO or other order on a person;
+  a fine within the body corporate maximum the framework gives (or an adjourned undertaking, discharge or
+  dismissal).
 - The reasons may not rely on a fact whose basis is "assumption", for or against the offender.
 - Where the framework lists other readings that "the Manual leaves open", prefer a sentence that is lawful on
   every such reading; if none is reasonably open, say in unresolved which reading the proposal follows and why.
   A reading the app adds (app policy) or one that "applies only if those facts are proved" must not drive the
   sentence (adverse facts need proof beyond reasonable doubt): note in unresolved what would change under it.
-- Version 1 can propose only these dispositions: imprisonment, imprisonment_and_cco, cco, mtmo, fine,
-  adjourned_undertaking, discharge, dismissal. If the facts point to another order (a youth justice centre
-  order, a court secure treatment order, a residential treatment order, a drug and alcohol treatment order or an
-  indefinite sentence), say so in unresolved and propose the best supported of the listed dispositions.
+- The app can propose only these dispositions: imprisonment, imprisonment_and_cco, cco, mtmo, fine,
+  adjourned_undertaking, discharge, dismissal, life_imprisonment. If the facts point to another order (a youth
+  justice centre order, a court secure treatment order, a residential treatment order, a drug and alcohol treatment
+  order, an indefinite sentence, or for contempt a suspended or indeterminate committal), say so in unresolved and
+  propose the best supported of the listed dispositions.
 
 Reasons: write the reasons as short paragraphs (heading + text), each citing item_ids, passage_ids and fact_ids.
 Explain how the considerations were weighed together; do not add up factors. The band must respect the same rules
@@ -246,9 +271,9 @@ List every case that STARTS on one of the lines the input says to cover. For eac
 - citation: the name and citation exactly as written; court from the citation (VSCA = Court of Appeal, VCC =
   County Court, VSC = Supreme Court); year from the citation.
 - principal_offence_id: the offence the case is listed under — usually the deepest heading in force that names an
-  offence (not a court name such as "County Court"); otherwise its most serious offence — as one of the offence ids
-  listed in the input, or "other"; principal_offence: its name.
-- offences: every offence charged, in order, each with one of the listed ids (or "other"), its individual sentence
+  offence (not a court name such as "County Court"); otherwise its most serious offence — as one of the offence codes
+  listed in the input (e.g. "27-05"), or "other"; principal_offence: its name.
+- offences: every offence charged, in order, each with one of the listed codes (or "other"), its individual sentence
   copied as written (e.g. "RCSI – 6 years") and that sentence in months if it is a term of imprisonment (e.g. "9
   years 9 months" = 117; "2 years x 2": the sentence for one count); null if it is not imprisonment or not given.
   A count repeated "x 2" is one entry with the number of counts kept in the name.
@@ -272,15 +297,17 @@ description does not say.
 
 For each field, give the answer the description states, or "unknown" / "unclear" / null / an empty string when it
 does not state it. Do not guess:
-- offence_id: one of the listed ids only if the description names the charge or the offence (e.g. "pleaded guilty
-  to recklessly causing serious injury"). If it only describes the conduct, answer "unclear" and say in
-  offence_as_described what the conduct is. "other" for any offence that is not listed.
+- offence_id: one of the listed codes (e.g. "25-04") only if the description names the charge or the offence (e.g.
+  "pleaded guilty to recklessly causing serious injury"). If it only describes the conduct, answer "unclear" and
+  say in offence_as_described what the conduct is. "other" for any offence that is not listed.
 - court: only if the description names it. offence_date (YYYY-MM-DD) only if it gives the exact day; otherwise give
   offence_year if it gives the year. offence_date_end only for an offence committed over a period.
 - plea: "guilty" if the offender pleaded guilty; "found_guilty_at_trial" only if the description says the offender
   was found guilty (convicted) after a trial — a plea of not guilty alone is not a verdict. plea_timing:
   earliest_opportunity (e.g. "at the first available opportunity", "early plea"), after_committal (some delay),
   late (at or near trial), not_applicable (found guilty at trial), otherwise unknown.
+- offender_type: body_corporate if the offender is a company or other body corporate, natural_person if a person,
+  otherwise unclear. A body corporate has no age (leave the ages null).
 - age_at_offence / age_at_sentence: the ages stated (or that follow directly from stated dates of birth).
 - Facts that count against the offender (prior convictions, being on parole, intoxication, the victim being an
   emergency worker, custodial officer or youth justice custodial worker on duty, the offender knowing that, no
@@ -289,6 +316,13 @@ does not state it. Do not guess:
   "unknown". Never infer them. "none"/"no" likewise only if the description says so; otherwise "unknown".
 - accessory_only: "no" if the offender committed the offence personally; "yes" only if they were found guilty for
   directing, assisting or encouraging another.
+- The charge-specific questions — manslaughter_circumstance, prosecution_notice, official_injured,
+  category_condition_met, conditional_condition_met — apply only to the offences their descriptions name, and each
+  counts against the offender: answer them only for those offences and only if the description states the fact as
+  established; otherwise "unknown". Answer "no" (or "neither" for manslaughter_circumstance) only if the description
+  says in so many words that the fact is absent (e.g. "the prosecution gave no notice", "neither gross violence nor
+  a single punch"): a description of how the offence happened is not enough, so "stabbed him" does not answer
+  "neither". The user confirms every such answer before it is used.
 - quotes: for every answer that is not unknown, unclear, null or empty (including plea_timing and the case name),
   the words of the description that show it, copied exactly, one entry per field: a phrase of at least two words,
   and at least three for a fact that counts against the offender (e.g. "two prior convictions for assault", not

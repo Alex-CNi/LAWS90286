@@ -5,9 +5,12 @@ What the page does, top to bottom:
   A. Status — how many cases, how many are in use and embedded, by offence
   B. Add cases — upload documents of case summaries (e.g. the Judicial College's
      Sentencing Manual case summaries, downloaded by the user); the AI splits each
-     document into individual cases and labels each by the offences charged
-     (core/cases.py chunk_document: one AI call per part of the document), then
-     each case is embedded (one embeddings request per 48 cases)
+     document into individual cases and labels each by the offences charged — any
+     offence of the Manual's register, or "other" (core/cases.py chunk_document: one
+     AI call per part of the document, listing the offences of the chapters the user
+     says the document covers), then each case is embedded (one embeddings request
+     per 48 cases). Cases saved by version 1.x (chapter 25 labels only) can be
+     relabelled by their names, with no AI
   C. Save and load — download the database as a JSON file, load it again later,
      or commit it to the repository as cases/database.json so that every user starts with it
   D. The cases — a table to check and correct the labels and figures, untick a case
@@ -30,20 +33,21 @@ import streamlit as st
 
 from app_pages.common import (case_db_changed, get_case_db, get_committed_case_db, get_kb, has_key, make_llm,
                               show_case)
+from app_pages.theme import hero
 from core import config
-from core.cases import (CaseDB, case_labels, check_figures, chunk_document, read_document, relabel_case, segments,
-                        set_principal_sentence, to_lines)
+from core.cases import (CaseDB, case_labels, check_figures, chunk_document, read_document, relabel_by_name,
+                        relabel_case, segments, set_principal_sentence, to_lines)
 from core.llm import LLMError
 
 kb = get_kb()
 db = get_case_db()
-LABELS = case_labels(kb)                              # (register id, offence name): chapter 25 offences
+LABELS = case_labels(kb)                              # (register id, charge label): every register offence
 NAME_OF = dict(LABELS)
 ID_OF = {name: rid for rid, name in LABELS}
 OTHER = "Other offence"
 CONFIRM_ABOVE = 30                                    # more AI calls than this: ask the user to confirm
 
-st.title("Case database")
+hero("Your case database", small=True)
 st.markdown(
     "Upload sentencing case summaries — for example the Judicial College's *Sentencing Manual case summaries*. "
     "Its **Word or PDF download** works best; a page saved from the browser may not contain the cases, because "
@@ -117,6 +121,11 @@ with st.container(border=True):
     uploads = st.file_uploader("Documents of case summaries (.docx, .pdf, .txt, .md, .html)",
                                type=["docx", "pdf", "txt", "md", "html", "htm"], accept_multiple_files=True,
                                key="cdb_files")
+    chapters = st.multiselect(
+        "Chapters of the Manual the documents cover", config.CASE_LABEL_CHAPTERS,
+        default=config.CASE_LABEL_CHAPTERS, format_func=kb.chapter_title, key="cdb_chapters",
+        help="Each AI call lists the offences of these chapters for the labels (fewer chapters: shorter calls). A "
+             "case for an offence of a chapter not chosen is labelled “Other offence”; you can relabel it below.")
     plan, total = [], 0
     for up in uploads or []:
         try:
@@ -138,15 +147,18 @@ with st.container(border=True):
                f"{config.CHUNK_PARALLEL} calls at a time; these calls are not part of any estimate run. Stay on this "
                "page until it finishes: clicking elsewhere stops it and cancels the parts not yet started. Chunking "
                "a document again adds only the cases not already here.")
+    if plan and not chapters:
+        st.warning("Choose at least one chapter: the labels come from the chapters' offences.")
     if st.button(f"Chunk and label the cases with AI ({total} AI call(s)) →", type="primary",
-                 disabled=not (has_key() and plan and confirmed)):
+                 disabled=not (has_key() and plan and confirmed and chapters)):
         llm = make_llm()
         summaries = []
         for name, text in plan:
             with st.status(f"Chunking {name}…", expanded=True) as status:
                 bar = st.progress(0.0)
                 try:
-                    report = chunk_document(llm, kb, name, text, progress=lambda f, m: bar.progress(f, text=m))
+                    report = chunk_document(llm, kb, name, text, progress=lambda f, m: bar.progress(f, text=m),
+                                            chapters=chapters)
                 except Exception as exc:  # noqa: BLE001 — shown, not raised
                     status.update(label=f"{name}: stopped ({type(exc).__name__}: {exc})", state="error")
                     summaries.append({"file": name, "error": f"{type(exc).__name__}: {exc}"})
@@ -293,6 +305,17 @@ def label_of(c) -> str:
     return c.principal_offence_id or OTHER
 
 
+def relabel_other():
+    """Callback: label the "other" cases whose offence name as written is exactly one register offence's name."""
+    db = st.session_state.case_db
+    changed = relabel_by_name(db, kb)
+    if changed:
+        case_db_changed()
+    st.session_state.cdb_notice = ("success", f"Labelled offences in {changed} case(s) by their names." if changed
+                                   else "No offence marked “Other offence” has a name that is exactly one register "
+                                        "offence's name.")
+
+
 def snapshot(cases) -> str:
     return json.dumps([[c.use, c.principal_offence_id, c.offences, c.head_sentence_months, c.npp_months]
                        for c in cases], default=str)
@@ -308,9 +331,10 @@ if db.cases:
         unknown = sorted({c.principal_offence_id for c in db.cases
                           if c.principal_offence_id and c.principal_offence_id not in NAME_OF})
         options = [n for _, n in LABELS] + [OTHER] + unknown
+        present = {label_of(c) for c in db.cases}
         f1, f2 = st.columns([1, 1])
-        show = f1.selectbox("Show", ["All cases", "Cases to check", "The same decision listed again"] + options,
-                            key="cdb_show")
+        show = f1.selectbox("Show", ["All cases", "Cases to check", "The same decision listed again"]
+                            + [o for o in options if o in present], key="cdb_show")
         search = f2.text_input("Search the case names", key="cdb_search").strip().lower()
         same = db.same_decision()
         rows, shown = [], []
@@ -383,6 +407,14 @@ if db.cases:
         unused = [c.id for c in db.cases if not c.use]
         if unused:
             st.button(f"Delete the {len(unused)} case(s) not in use", on_click=delete_unused)
+        others = sum(1 for c in db.cases if not c.principal_offence_id or any(not o.get("offence_id")
+                                                                                for o in c.offences))
+        if others:
+            st.button(f"Label the offences marked “Other offence” in {others} case(s) by their names (no AI)",
+                      on_click=relabel_other,
+                      help="An offence — the principal one or another offence charged — keeps “Other offence” unless "
+                           "its name as written is exactly the name of one register offence (e.g. cases saved by "
+                           "version 1.x, which labelled only chapter 25 offences). Check the labels afterwards.")
 
         st.markdown("**Read a case**")
         pick = st.selectbox("Case", [c.id for c in db.cases], key="cdb_pick",

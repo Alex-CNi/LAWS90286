@@ -57,7 +57,7 @@ class CaseRecord:
     court: str                         # Court of Appeal | County Court | Supreme Court | unknown
     year: int | None
     section: str                       # the document headings the case sits under ("4.4 – … › 4.4.2 – County Court")
-    principal_offence_id: str | None   # a register id (config.CASE_LABEL_CHAPTERS), or None = another offence
+    principal_offence_id: str | None   # a register id (any chapter of config.CASE_LABEL_CHAPTERS), or None = another
     principal_offence: str             # its name as written in the document
     offences: list[dict]               # every offence charged: [{name, offence_id, sentence_text, sentence_months}]
     head_sentence_text: str            # the head sentence / orders as the model copied it
@@ -124,11 +124,52 @@ def set_principal_sentence(c: CaseRecord, months: float | None) -> bool:
     return True
 
 
-def case_labels(kb: KnowledgeBase) -> list[tuple[str, str]]:
-    """The offences a case can be labelled with: the register rows of config.CASE_LABEL_CHAPTERS
-    (chapter 25, causing injury), as (id, name)."""
-    return [(rid, row.get("offence") or rid) for rid, row in kb.offences.items()
-            if str(row.get("chapter")) in config.CASE_LABEL_CHAPTERS]
+def case_labels(kb: KnowledgeBase, chapters=None) -> list[tuple[str, str]]:
+    """The offences a case can be labelled with: every register offence of config.CASE_LABEL_CHAPTERS (the Manual's
+    Part E), or of the chapters given, as (id, the charge box's label: unique, e.g. "27 · Armed robbery — …")."""
+    wanted = {str(c) for c in (chapters or config.CASE_LABEL_CHAPTERS)}
+    return [(oid, kb.charge_label(oid)) for oid in config.IN_SCOPE_OFFENCES if kb.offence_chapters(oid) & wanted]
+
+
+def unique_names(kb: KnowledgeBase, ids) -> dict[str, str]:
+    """normalised offence name -> register id, for the names only one of these offences has (a fallback when a model
+    gives the name instead of the code; a name two offences share is never used)."""
+    counts = Counter(_norm(kb.offence(oid).get("offence") or "") for oid in ids)
+    return {_norm(kb.offence(oid).get("offence") or ""): oid for oid in ids
+            if counts[_norm(kb.offence(oid).get("offence") or "")] == 1}
+
+
+def related_offences(kb: KnowledgeBase, offence_id: str) -> set[str]:
+    """The "related offences" tier of comparable cases (app policy, POLICY): the other offences in the same section
+    of the Manual's register as the charge (e.g. 27.1.1.2: robbery, armed robbery, burglary, home invasion …; 25.1.1:
+    the causing injury offences)."""
+    section = str((kb.offences.get(offence_id) or {}).get("section") or "")
+    if not section:
+        return set()
+    return {oid for oid in config.IN_SCOPE_OFFENCES if oid != offence_id
+            and str(kb.offence(oid).get("section") or "") == section}
+
+
+def relabel_by_name(db: "CaseDB", kb: KnowledgeBase) -> int:
+    """Cases labelled "other" (e.g. by version 1.x, which labelled only chapter 25 offences): each principal offence or
+    offence charged whose name as written is exactly one register offence's name takes that offence's label. No AI
+    and no guessing: a name that is not exactly one offence's name stays "other". Returns how many cases changed."""
+    names = unique_names(kb, config.IN_SCOPE_OFFENCES)
+    changed = 0
+    for c in db.cases:
+        touched = False
+        for o in c.offences:
+            if not o.get("offence_id") and _norm(o.get("name", "")) in names:
+                o["offence_id"] = names[_norm(o.get("name", ""))]
+                touched = True
+        if not c.principal_offence_id and _norm(c.principal_offence) in names:
+            c.principal_offence_id = names[_norm(c.principal_offence)]
+            touched = True
+        if touched:
+            c.figures_note = check_figures(c)
+            c.edited = True                   # the labels are no longer the AI's (the user asked for this)
+            changed += 1
+    return changed
 
 
 def _norm(text: str) -> str:
@@ -856,13 +897,12 @@ def split_segment(lines: list[str], seg: Segment, overlap: int | None = None) ->
             Segment(mid, seg.own_end, seg.shown_end, seg.depth + 1)]
 
 
-def segment_input(file_name: str, lines: list[str], seg: Segment, labels: list[tuple[str, str]],
-                  headings: HeadingIndex) -> str:
+def segment_input(file_name: str, lines: list[str], seg: Segment, labels: str, headings: HeadingIndex) -> str:
+    """One chunking call's input. labels: the offence codes it may use (kb.offence_code_list)."""
     shown = "\n".join(f"L{k + 1}: {lines[k]}" for k in range(seg.start, seg.shown_end))
-    ids = "\n".join(f"{rid}: {name}" for rid, name in labels)
     path = " › ".join(headings.before(seg.start)) or "none"
     return (f"## Document\nFile: {file_name}. Headings in force before these lines: {path}.\n\n"
-            f"## Offence ids you may use (anything else: \"other\")\n{ids}\n\n"
+            f"## Offence codes you may use (anything else: \"other\")\n{labels}\n\n"
             f"## Lines to cover\nList the cases that START on lines L{seg.start + 1}–L{seg.own_end}. "
             + (f"Lines after L{seg.own_end} are shown only so that you can see where a case ends.\n\n"
                if seg.shown_end > seg.own_end else "\n\n")
@@ -908,17 +948,18 @@ class ChunkReport:
 
 
 def chunk_document(llm: LLM, kb: KnowledgeBase, file_name: str, text: str, progress=None,
-                   parallel: int | None = None) -> ChunkReport:
+                   parallel: int | None = None, chapters=None) -> ChunkReport:
     """Split a document into cases: one AI call per part (several at a time), one retry of each part that
-    failed, then each case's lines taken from the document and checked."""
+    failed, then each case's lines taken from the document and checked. chapters: the Manual's chapters the
+    document covers (each call lists only their offences); default every chapter of Part E."""
     lines = to_lines(text)
     segs = segments(lines)
     headings = HeadingIndex(lines)
     doc_id = hashlib.sha1("\n".join(lines).encode()).hexdigest()[:12]
     report = ChunkReport(file_name=file_name, lines=len(lines), segments=len(segs))
-    labels = case_labels(kb)
-    allowed = {rid for rid, _ in labels}
-    by_name = {_norm(name): rid for rid, name in labels}
+    labels, codes = kb.offence_code_list(chapters or config.CASE_LABEL_CHAPTERS)     # short codes (guide step 20)
+    allowed = {"codes": codes, "ids": set(codes.values())}
+    by_name = unique_names(kb, codes.values())
     found: list[tuple[Segment, object]] = []
     failed: list[tuple[Segment, str]] = []
 
@@ -1035,11 +1076,15 @@ def _citation_line(lines: list[str], first: int, citation: str, lo: int, hi: int
     return j
 
 
-def _label(value: str, name: str, allowed: set[str], by_name: dict[str, str]) -> str | None:
-    v = (value or "").strip().strip("[]`'\"").strip().lower()
-    if v in allowed:
-        return v
-    return by_name.get(_norm(name))           # the model gave the offence's name instead of its id
+def _label(value: str, name: str, allowed: dict, by_name: dict[str, str]) -> str | None:
+    """A register id from the model's answer: a listed code ("27-05"), or a listed id, or — if neither — the offence's
+    name when exactly one listed offence has it; otherwise None ("other")."""
+    v = (value or "").strip().strip("[]`'\"").strip()
+    if v in allowed["codes"]:
+        return allowed["codes"][v]
+    if v.lower() in allowed["ids"]:
+        return v.lower()
+    return by_name.get(_norm(name))           # the model gave the offence's name instead of its code
 
 
 def _record(c, body, file_name, first, last, headings, allowed, by_name) -> CaseRecord:
@@ -1183,8 +1228,8 @@ class CaseDB:
         return [c for c in self.cases if c.use]
 
     def counts_by_offence(self, kb: KnowledgeBase) -> list[tuple[str, int]]:
-        names = dict(case_labels(kb))
-        return Counter(names.get(c.principal_offence_id, "Other offences") for c in self.cases).most_common()
+        return Counter(kb.charge_label(c.principal_offence_id) if c.principal_offence_id in kb.offences
+                       else "Other offences" for c in self.cases).most_common()
 
     def same_decision(self) -> dict[str, str]:
         """case id -> the id of an earlier case that is the same decision listed again (same citation and the
@@ -1291,11 +1336,13 @@ def load_committed(path=None) -> CaseDB | None:
 # ─────────────────────────────────────────────────────────────────────────────
 # 6. Choosing the most similar cases for a run
 # ─────────────────────────────────────────────────────────────────────────────
-MATCHES = ["same offence", "offence also charged in that case", "related injury offence", "other offence"]
-POLICY = ("app policy: cases for the same offence first, then cases in which that offence was also charged, then "
-          "related injury offences; cases for other offences are not used; a case that looks like the case being "
-          "estimated, or that you left out, is not used, nor is any other listing of the same decision; the same "
-          "decision listed twice is used once")
+MATCHES = ["same offence", "offence also charged in that case", "related offence (same section of the register)",
+           "other offence"]
+POLICY = ("app policy: cases for the same offence first, then cases in which that offence was also charged, then cases "
+          "for an offence in the same section of the Manual's offence register (e.g. robbery, burglary and home invasion "
+          "in 27.1.1.2; the causing injury offences in 25.1.1); cases for other offences are not used; a case that "
+          "looks like the case being estimated, or that you left out, is not used, nor is any other listing of the "
+          "same decision; the same decision listed twice is used once")
 
 
 def case_query_text(kb: KnowledgeBase, facts) -> str:
@@ -1391,7 +1438,7 @@ def _id_number(case_id: str) -> int:
 
 def select_comparables(db: CaseDB | None, offence_id: str, query_vector=None, query_text: str = "",
                        k: int | None = None, case_name: str = "", narrative: str = "",
-                       exclude_ids=()) -> Comparables:
+                       exclude_ids=(), related: set[str] | None = None) -> Comparables:
     """The k cases most similar to the confirmed facts, the same offence first (see POLICY).
     Cosine similarity of query_vector with the case vectors if every case in use has one; otherwise keyword
     ranking of query_text. A case is left out if the user left it out, or if it looks like the case being
@@ -1413,7 +1460,9 @@ def select_comparables(db: CaseDB | None, offence_id: str, query_vector=None, qu
         out.method = "keyword ranking (BM25), because " + (
             "some cases in use have no embeddings" if not db.has_vectors() else "the facts were not embedded")
         out.score_label = "keyword score"
-    related = set(config.CASE_RELATED_OFFENCES)
+    # The "related offences" tier: the other offences in the charge's section of the register (related_offences;
+    # app policy) — a theft is never given s 16 or s 17 cases as yardsticks.
+    related = set(related or ()) - {offence_id}
 
     def tier(c: CaseRecord) -> int:
         if c.principal_offence_id == offence_id:
@@ -1476,7 +1525,8 @@ def select_comparables(db: CaseDB | None, offence_id: str, query_vector=None, qu
         chosen.append(entry)
     out.selected = chosen[:k or config.CASES_FOR_COMPARISON]
     if not out.selected:
-        out.note = (f"none of the {len(cases)} cases in use is for this offence or a related injury offence"
+        out.note = (f"none of the {len(cases)} cases in use is for this offence"
+                    + (" or an offence in the same section of the register" if related else "")
                     + (f" ({len(out.left_out)} left out)" if out.left_out else "") + ".")
     return out
 

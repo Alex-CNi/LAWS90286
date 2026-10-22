@@ -27,13 +27,16 @@ TEXT = ("DPP v Lane. On 3 May 2023 the offender, aged 27, punched the victim in 
 def answer(**changes) -> SortedCase:
     """A sorting answer that gives nothing, with the given changes."""
     base = dict(case_name="", offence_id="unclear", offence_as_described="", court="unclear", offence_date="",
+                offender_type="unclear",
                 offence_date_end="", offence_year=None, plea="unclear", plea_timing="unknown", age_at_offence=None,
                 age_at_sentence=None, prior_convictions="unknown", serving_sentence_or_on_parole="unknown",
                 mental_impairment_evidence="unknown", intoxicated_by_liquor="unknown",
                 intoxication_contributed="unknown", previous_aeo="unknown", cooperation="unknown",
                 victim_protected_worker="unknown", offender_knew_or_reckless="unknown", accessory_only="unknown",
                 presentence_detention_days=None, presentence_report="unknown", cco_consent="unknown",
-                arising_from_driving="unknown", quotes=[], outside_version_1=[], not_stated=[])
+                arising_from_driving="unknown", manslaughter_circumstance="unknown", prosecution_notice="unknown",
+                official_injured="unknown", category_condition_met="unknown", conditional_condition_met="unknown",
+                quotes=[], outside_version_1=[], not_stated=[])
     base.update(changes)
     return SortedCase(**base)
 
@@ -184,7 +187,9 @@ def test_the_sorting_call_and_a_run_that_starts_with_it(kb, retriever):
     s, record = sort_description(llm, description, kb)
     assert record.step == SORT_STEP and record.ok and record.kind == "ai"
     sent = fake.requests[-1]["body"]
-    assert S17 in str(sent["input"]) and sent["text"]["format"]["name"] == "SortedCase"
+    code = next(c for c, oid in kb.offence_codes().items() if oid == S17)        # the call sees short codes
+    assert f"{code}: {kb.offence_label(S17)}" in str(sent["input"]) and S17 not in str(sent["input"])
+    assert sent["text"]["format"]["name"] == "SortedCase"
     assert s.values["offence_id"] == S17 and "cco_consent" in s.unverified
     assert s.adverse == {"prior_convictions": "some", "intoxicated_by_liquor": "yes"}
     values = simple_case_values(s.values, {})

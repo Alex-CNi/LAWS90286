@@ -21,8 +21,11 @@ from collections import Counter
 from dataclasses import dataclass
 
 from core import config
+from core.agreement import DISCLAIMER as AGREEMENT_DISCLAIMER
+from core.agreement import band_agreement
 from core.cases import POLICY, CaseRecord, months_label
 from core.checks import months_text
+from core.facts import asked_charge_questions, charge_answer_text, charge_question
 from core.framework import RELATED_FLAGS_GATE, flag_applies
 from core.kb import KnowledgeBase
 from core.pipeline import Run
@@ -42,7 +45,7 @@ class Block:
 LABELS = {"imprisonment": "Imprisonment", "imprisonment_and_cco": "Imprisonment combined with a CCO",
           "cco": "Community correction order (CCO)", "mtmo": "Mandatory treatment and monitoring order",
           "fine": "Fine", "adjourned_undertaking": "Adjourned undertaking", "discharge": "Discharge",
-          "dismissal": "Dismissal"}
+          "dismissal": "Dismissal", "life_imprisonment": "Life imprisonment"}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -51,7 +54,10 @@ LABELS = {"imprisonment": "Imprisonment", "imprisonment_and_cco": "Imprisonment 
 def describe_sentence(p: Proposal) -> str:
     t = p.disposition_type
     parts = []
-    if t in ("imprisonment", "imprisonment_and_cco") or (t == "mtmo" and p.term_months):
+    if t == "life_imprisonment":
+        parts.append("Life imprisonment" + (f", with a non-parole period of {months_text(p.npp_months)}" if p.npp_months
+                                            else ", with no non-parole period"))
+    elif t in ("imprisonment", "imprisonment_and_cco") or (t == "mtmo" and p.term_months):
         s = f"Imprisonment for {months_text(p.term_months)}"
         s += f", with a non-parole period of {months_text(p.npp_months)}" if p.npp_months else ", with no non-parole period"
         parts.append(s)
@@ -83,6 +89,8 @@ def _condition_text(c) -> str:
 
 def protected_text(fw) -> str:
     """The protected-official status as the framework applies it (screen and report)."""
+    if fw.offence_id not in config.CAUSING_INJURY_OFFENCES:
+        return "Not applicable to this charge (ss 15A–18 only)"
     text = fw.protected_official
     if fw.protected_assumed_no:
         text += " (treated as not proved, app policy)"
@@ -93,7 +101,8 @@ def protected_text(fw) -> str:
 
 def minimum_text(fw) -> str:
     if not fw.mnpp_months:
-        return "None on these facts"
+        return "None on the facts as entered" + (" — one applies only if further facts are proved (see the other "
+                                                  "readings)" if any(a.mnpp_months for a in fw.alternatives) else "")
     return months_text(fw.mnpp_months) + (f" — EXCLUDED: {fw.mnpp_excluded}" if fw.mnpp_excluded else "")
 
 
@@ -208,6 +217,15 @@ def comparables_blocks(run: Run) -> list[Block]:
         B.append(Block("table", headers=["Id", "Case", "Match (principal offence); score",
                                          "Its sentence for this offence", "Head sentence / orders", "Relied on in"],
                        items=rows))
+    a = run.current
+    if comp.selected and a and a.proposal.proposal:
+        ag = band_agreement(comp, a.proposal.proposal.band, run.case.offence_id)
+        B.append(Block("h3", "These cases against the estimate's range (a check, not a probability)"))
+        B.append(Block("p", f"{ag.note} {AGREEMENT_DISCLAIMER} Range compared: {ag.band_text}. Only a sentence for "
+                            "this offence is compared (app policy, core/agreement.py)."))
+        B.append(Block("table", headers=["Id", "Sentence compared", "From", "Against the range", "Why"],
+                       items=[[r.id, r.outcome or "—", r.source or "—", r.position, r.reason or "—"]
+                              for r in ag.rows]))
     if comp.left_out:
         B.append(Block("h3", "Left out"))
         B.append(Block("bullets", items=[f"{e['id']} {e['case'].get('citation', '')}: {e['reason']}"
@@ -265,6 +283,12 @@ def build_blocks(run: Run, kb: KnowledgeBase) -> list[Block]:
                 f"{n.fine_penalty_units} penalty units" if n.fine_penalty_units else ""] if x)
             B.append(Block("p", f"**Section 6AAA.** But for the guilty plea the sentence would have been: {notional}"
                                 + (f" ({figs})" if figs else "") + "."))
+        scheme = bool(fw and fw.sso and fw.sso.applies != "no")          # only where the scheme applies
+        if scheme and (p.standard_sentence_statement or "").strip():
+            B.append(Block("p", f"**Standard sentence.** {p.standard_sentence_statement}"))
+        if scheme and (p.npp_interests_of_justice_reason or "").strip():
+            B.append(Block("p", f"**Non-parole period below the s 11A(4) floor — interests of justice.** "
+                                f"{p.npp_interests_of_justice_reason}"))
         if p.special_reason.found:
             B.append(Block("p", f"**Special reason** ({(p.special_reason.limb or '').replace('_', ' ')}): "
                                 f"{p.special_reason.evidential_basis}"))
@@ -273,9 +297,10 @@ def build_blocks(run: Run, kb: KnowledgeBase) -> list[Block]:
                                 f"{p.category2_exception.evidential_basis}"))
         if p.ancillary_orders:
             B.append(Block("bullets", items=[f"{o.type.replace('_', ' ').capitalize()} ({o.status})"
-                                             + (f", {months_text(o.months)}" if o.months else "") + f": {o.details}"
+                                             + (f", {months_text(o.months)}" if o.months else "")
+                                             + (f": {o.details.strip()}" if o.details.strip() else "")
                                              for o in p.ancillary_orders]))
-        if case.presentence_detention_days and p.term_months:
+        if case.presentence_detention_days and (p.term_months or p.disposition_type == "life_imprisonment"):
             B.append(Block("p", f"**Time served.** Declare {case.presentence_detention_days} days of pre-sentence "
                                 "detention."))
         hard_err = sum(1 for c in a.checks if c.outcome == "error")
@@ -291,6 +316,10 @@ def build_blocks(run: Run, kb: KnowledgeBase) -> list[Block]:
                                if run.revision_error else "")
                             + (" Errors remain: do not rely on this estimate without resolving them."
                                if hard_err or aud_err or gate_err else "")))
+        comp = run.comparables
+        if comp and comp.available:
+            ag = band_agreement(comp, p.band, case.offence_id)
+            B.append(Block("p", f"**Similar cases.** {ag.note} {AGREEMENT_DISCLAIMER} (See section 9.)"))
     else:
         B.append(Block("p", "No proposal yet."))
     if case.user_role == "prosecution":
@@ -302,9 +331,14 @@ def build_blocks(run: Run, kb: KnowledgeBase) -> list[Block]:
     B.append(Block("p", f"{kb.offence_label(case.offence_id)}; offence date {case.offence_date.isoformat()}"
                         + (f" to {case.offence_date_end.isoformat()}" if case.offence_date_end else "")
                         + f"; {case.court}; plea: {'guilty' if case.plea == 'guilty' else 'found guilty at trial'}; "
-                          f"offender aged {case.age_at_offence} at the offence and {case.age_at_sentence} at sentence"
-                          + (" (assumed: not stated, taken as the age at the offence)."
-                             if getattr(case, "age_at_sentence_assumed", False) else ".")))
+                        + ("the offender is a body corporate." if case.body_corporate else
+                           f"offender aged {case.age_at_offence} at the offence and {case.age_at_sentence} at sentence"
+                           + (" (assumed: not stated, taken as the age at the offence)."
+                              if getattr(case, "age_at_sentence_assumed", False) else "."))))
+    asked = asked_charge_questions(kb, case)                # the answers this charge's statutory scheme turns on
+    if asked:
+        B.append(Block("bullets", items=[f"{charge_question(kb, f, case.offence_id)[0]} "
+                                         f"**{charge_answer_text(f, getattr(case, f)).capitalize()}**" for f in asked]))
     if facts:
         B.append(Block("p", facts.summary))
         B.append(Block("table", headers=["Fact", "Bearing", "Basis"],
@@ -316,13 +350,23 @@ def build_blocks(run: Run, kb: KnowledgeBase) -> list[Block]:
     # ── 3. Framework ──
     if fw:
         B.append(Block("h2", "3. The legal framework (worked out in code)"))
-        rows = [["Maximum", f"{fw.maximum.text} — {months_text(fw.maximum.months)} ({fw.maximum.period})"],
-                ["Maximum fine", f"{fw.maximum.fine_penalty_units} penalty units (10 per month of the maximum term)"
+        rows = [["Maximum", fw.maximum.describe()],
+                ["Maximum fine" + ((" (entered for the body corporate)" if fw.maximum.fine_source == "entered"
+                                    else " (a natural person's)") if fw.body_corporate else ""),
+                 f"{fw.maximum.fine_penalty_units} penalty units ("
+                 + {"printed": "as printed", "entered": "as you entered it from the Manual's table"}.get(
+                     fw.maximum.fine_source, "10 per month of the maximum term") + ")"
                  if fw.maximum.fine_penalty_units else "—"],
                 ["Category", f"Category {fw.category}" if fw.category else "None on these facts"],
                 ["Protected official", protected_text(fw)],
                 ["Mandatory minimum NPP", minimum_text(fw)],
                 ["Dispositions", fw.dispositions_note]]
+        if fw.sso:
+            rows.append(["Standard sentence (VSM 9.2)", fw.sso.line()])
+        if fw.licence:
+            rows.append(["Mandatory licence order (VSM 16)", fw.licence.line()])
+        if fw.body_corporate:
+            rows.append(["Body corporate fine maximum", fw.maximum.company_fine_text()])
         if fw.pu_value:
             rows.append(["Penalty unit value", fw.pu_value])
         rows += [[reading_heading(a), f"{a.title}: {a.summary()}."] for a in fw.alternatives]

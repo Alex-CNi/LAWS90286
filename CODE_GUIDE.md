@@ -6,8 +6,8 @@ Every Python file starts with a docstring saying what it does, and is divided in
 ## 1. The files
 
 ```
-streamlit_app.py          Entry point: page setup and colours, the sidebar (API key + model settings), the page list
-.streamlit/config.toml    The colour scheme (dark navy, light text, blue accents) and the upload limit
+streamlit_app.py          Entry point: page setup, the look and the logo, the sidebar (API key + model settings), the pages
+.streamlit/config.toml    The theme (dark navy, Lato from static/fonts, heading sizes), static serving, the upload limit
 api_key.py                The course's API Credentials sidebar module (password field, masked status)
 app_pages/
   estimate.py             The main page: Steps 1–7 for one case (form, facts, framework, results, report)
@@ -15,7 +15,10 @@ app_pages/
   knowledge_base.py       Search and browse the knowledge base; build the search index
   about.py                Method, scope and limitations (static text)
   common.py               Shared helpers: cached loading, the user's case database, model settings, display helpers
-  theme.py                The colours config.toml cannot set: the navy gradient behind the pages, the button gradient
+  theme.py                The CSS config.toml cannot set (gradient, sidebar tiles, headlines, start bar and pills,
+                          offence panel, cards, step pills, the result card) and the helpers hero(), steps_row() …
+  result_card.py          The result card: the estimate in large type, the range, the strip of similar cases, the
+                          share within the range, chips and the disclaimer (one HTML string for st.html)
 core/                     The logic, with no Streamlit code (so it can be tested without the UI)
   config.py               ALL SETTINGS: scope, models, effort, retrieval sizes, the case database, paths
   kb.py                   Loads knowledge/ ; finds items by stage/offence ; writes items into prompts ; citations
@@ -27,21 +30,31 @@ core/                     The logic, with no Streamlit code (so it can be tested
                           labels, figures check, CaseDB (embeddings, JSON save/load), choosing the most similar cases
   facts.py                Step 1–2: the CaseInput form object, validation, AI call 1 (facts), quote checks; the
                           simple input's sorting call (sort_description) and how its answers fill the form
-  framework.py            Step 3: maximum, Category 1/2, minimum non-parole periods, readings, gates, flags (code only)
+  framework.py            Step 3: maximum (life, conditional, relative to another offence), Category 1/2, minimum
+                          non-parole periods, the standard sentence scheme, licence orders, a body corporate's fine,
+                          readings, gates, flags (code only)
+  coverage.py             The questions a charge's statutory scheme turns on (charge_questions), the licence map and
+                          the schemes' dates; NOT_YET_CHECKED lists any feature the checks do not implement (empty in
+                          2.0; an entry gives the "Not fully checked" caution)
   stages.py               Step 4: the four stage analyses (AI calls 2–5), item selection, citation cleaning
   synthesis.py            Step 5: the proposed sentence (AI call 6) and the revision call
-  checks.py               Step 6: the 19 hard checks in code; the reading-dependent ones (READING_CHECKS) also run
+  checks.py               Step 6: the 22 hard checks in code; the reading-dependent ones (READING_CHECKS) also run
                           under every other reading and are merged (merge_readings)
   audit.py                Step 6: the audit of the reasoning (AI call 7)
   pipeline.py             The order of the steps; the Run object that remembers one case
+  agreement.py            After the proposal: each comparable case placed below / within / above the band, and the
+                          similarity-weighted share within it (a comparison with a few cases, never a probability)
   report.py               Step 7: the report (screen, Markdown, Word)
   results.py              CheckResult: the outcome of one check (pass / caution / error / unresolved)
 knowledge/                The knowledge base extracted from the Manual (read-only data; SCHEMA.md explains it)
 index/                    The search vectors (made by scripts/build_index.py; commit them)
 cases/                    Optional: database.json, a case database every user starts with (see cases/README.md)
+static/fonts/             The Lato font files (latin and latin-ext; SIL Open Font License, OFL.txt), served by the app
+assets/                   The logo and its icon (st.logo)
 scripts/build_index.py    Builds index/ once, with your key from .env
-test_cases/               The three README test cases (form values + narrative files); simple_example.txt, the
-                          invented description behind the simple input's "Use an example" button
+test_cases/               The README test cases (form values + narrative files): tc1–tc3 from version 1 and tc4–tc13,
+                          one per family of statutory schemes; simple_example.txt, the invented description behind
+                          the simple input's "Use an example" button
 tests/                    Automated tests; fake_openai.py simulates the OpenAI service; fixtures/ holds invented
                           case summaries for testing the case database
 ```
@@ -75,8 +88,9 @@ Form + narrative ──validate()──▶ AI call 1: extract_facts() ──▶ 
 repeat an AI call and every new case makes its own calls.
 
 **The two inputs** (Step 1 of `app_pages/estimate.py`): *Detailed* is the full form; its required questions
-(`facts.REQUIRED_FIELDS`: charge, court, date, plea, ages) start empty and `facts.validate()` refuses a case without
-them. *Simple* is a description, six optional answers (widget keys `"s_…"`) and the sorting call:
+(`facts.required_fields(offender_type)`: charge, court, date, plea, and the ages for a natural person) start empty and
+`facts.validate()` refuses a case without them — or, with `estimate.required_missing()`, one whose maximum the Manual
+cannot give (a charge fixed by reference to another offence) and the user has not entered. *Simple* is a description, six optional answers (widget keys `"s_…"`) and the sorting call:
 `facts.sort_description()` asks the model to sort the description into the form's questions (`prompts.SORTING`,
 schema `SortedCase`); `facts.sorted_input()` keeps only valid answers whose words show them (`facts.find_words`:
 whole words in one sentence, at least two — three for an answer against the offender — and such an answer not
@@ -104,8 +118,9 @@ receives it in `pipeline.run_remaining(..., case_db=...)` and keeps a snapshot o
 | To change… | Edit | Notes |
 |---|---|---|
 | The model for a step, or its reasoning effort | `core/config.py` → `DEFAULT_MODELS`, `DEFAULT_EFFORT`, `MODEL_OPTIONS` | Users can also change them in the sidebar for their session |
-| Which offences are accepted | `core/config.py` → `IN_SCOPE_OFFENCES` (ids from `knowledge/offences.json`), `OFFENCE_CHAPTERS` | Check the stage instructions in `prompts.py` (they mention chapter 25) and any offence-specific hard checks |
-| Courts or offender ages | `core/config.py` → `IN_SCOPE_COURTS`, `MIN_AGE_AT_OFFENCE` | Magistrates' Court limits and youth detention are not checked in version 1 |
+| Which offences are accepted | `core/config.py` → `IN_SCOPE_OFFENCES` (every register offence by default; `CAUSING_INJURY_OFFENCES` are the six version 1 charges) | Retrieval follows the charge's own Part E chapter (`kb.candidates`, `kb.comparable_passages`). For an offence's statutory scheme see `core/coverage.py` and `docs/ALL_OFFENCES_GUIDE.md` |
+| Courts or offender ages | `core/config.py` → `IN_SCOPE_COURTS`, `MIN_AGE_AT_OFFENCE` | Magistrates' Court limits and youth detention are not checked (guide step 18; VSM 10) |
+| A question a charge's scheme turns on | `core/facts.py` → `CaseInput` (default "unknown"), `CHARGE_QUESTION_CHOICES`, `charge_question`, `ADVERSE_VALUES`; `core/coverage.py` → `charge_questions`; then the framework or check that uses it | The recipe is `docs/ALL_OFFENCES_GUIDE.md` step 8: the form asks it only for the charges `charge_questions` names, only then does it reach the AI calls and the report, and the simple input and the suggestions are filtered the same way (`CHARGE_SPECIFIC_FIELDS`); add it to `tests/fake_openai.py` if it is in a schema |
 | What the AI is told | `core/prompts.py` | `COMMON_RULES` apply to every reasoning call |
 | The shape of an AI answer | `core/schemas.py` | Strict mode: no default values; then tell the model in `prompts.py` and use the field in code |
 | How many Manual items each call sees | `core/config.py` → `ITEMS_PER_STAGE`, `QUOTES_FOR_TOP_ITEMS`, `ITEMS_FOR_SYNTHESIS`, `PASSAGES_FOR_COMPARABLES` | More items = more tokens per run |
@@ -113,18 +128,20 @@ receives it in `pipeline.run_remaining(..., case_db=...)` and keeps a snapshot o
 | A hard check | `core/checks.py` | Write `check_x(ctx) -> list[CheckResult]`, add it to `OTHER_CHECKS` (or `READING_CHECKS` if it depends on the category or the minimum), add a test in `tests/test_checks.py` |
 | A point the Manual leaves open | `core/framework.py` → `build_readings` (add a `Reading`: kind "open", or "unproved" for facts not proved; `app_policy=True` if no Manual flag records the point) | Only `READING_CHECKS` run under it: a breach of those rules is an error only if it is one on every open reading (else "unresolved"); breaches only on an unproved reading are "If proved" cautions. Every other check's errors always stand |
 | A form field | `core/facts.py` → `CaseInput` (and `case_details_text`) and `app_pages/estimate.py` (Step 1, `detailed_input`) | The widget key must be `"f_" + field name`. For the simple input to fill it too: `schemas.SortedCase`, `prompts.SORTING`, `facts.sorted_input` (and `SORTED_CHOICE_FIELDS`, `SIMPLE_DEFAULTS`), `estimate.QUESTION` |
-| What the simple input asks for | `core/facts.py` → `REQUIRED_FOR_SIMPLE`; `app_pages/estimate.py` → `simple_input` (the optional answers) | A required answer must be given by the description or the user before AI call 1 |
+| What the simple input asks for | `core/facts.py` → `required_for_simple(offender_type)`; `app_pages/estimate.py` → `simple_input` (the optional answers) | A required answer must be given by the description or the user before AI call 1 |
 | The report | `core/report.py` → `build_blocks` | Markdown and Word are rendered from the same blocks |
-| The colours | `.streamlit/config.toml` → `[theme]`, `[theme.sidebar]`; `app_pages/theme.py` → `GRADIENT`, `BUTTON` | Delete `apply_theme()` in `streamlit_app.py` to drop the gradient |
+| The colours and the font | `.streamlit/config.toml` → `[theme]`, `[[theme.fontFaces]]`, `[theme.sidebar]`; `app_pages/theme.py` → `PALETTE`, `CSS` | Containers opt into a style by their key (`hero_bar`, `search_bar`, `areas`, `status_row`, `card_…`); delete `apply_theme()` in `streamlit_app.py` to go back to the plain theme |
+| The result card | `app_pages/result_card.py` → `card_html` (`headline`, `strip_html`, `agreement_html`, `chips_html`) | Escape every text from the case database or an AI call (`html.escape`); st.html keeps no scripts or inline SVG |
+| The share of similar cases within the range | `core/agreement.py` → `case_outcome`, `place`, `band_agreement`; `config.AGREEMENT_MIN_CASES` | Keep it a check, never a probability (see the rules below) |
 | Revisions allowed | `core/config.py` → `MAX_REVISIONS` | Each revision adds 2 AI calls |
 | Low OpenAI rate limit | sidebar → untick “Run the four analyses at the same time” (default: `PARALLEL_STAGES` in `core/config.py`) | Runs the four analyses one after another |
 | Fallback models | `core/config.py` → `FALLBACK_MODELS` | Tried in order if a model is not available to the key |
 | Embedding model | `core/config.py` → `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS` | Then rebuild the index; a saved case database made with another model loses its vectors on loading and the page embeds the cases again (with the user's key) |
 | How many comparable cases a run gets | `core/config.py` → `CASES_FOR_COMPARISON`, `CASE_TEXT_CHARS` | |
 | Which cases count as "the case being estimated" | `core/config.py` → `SAME_CASE_SIMILARITY`, `SAME_CASE_TEXT_OVERLAP`; `cases.select_comparables` | Left-out cases are listed in the report |
-| Which offences count as "related" (the third tier) | `core/config.py` → `CASE_RELATED_OFFENCES` | The six in-scope offences and s 24 by default |
+| Which offences count as "related" (the third tier) | `core/cases.py` → `related_offences` | The offences in the same section of the register as the charge (app policy, stated in `cases.POLICY`) |
 | Whether cases for other offences may be used | `core/config.py` → `CASES_INCLUDE_OTHER_OFFENCES` | Off by default (app policy, stated in `cases.POLICY` and the report) |
-| The offences a case can be labelled with | `core/config.py` → `CASE_LABEL_CHAPTERS` (register chapters) | Each label is listed in every chunking call |
+| The offences a case can be labelled with | `core/config.py` → `CASE_LABEL_CHAPTERS` (every Part E chapter); the Case database page narrows a document to its chapters | Each chunking call lists the chosen chapters' offences as short codes (`kb.offence_code_list`, as the simple input's sorting call does), mapped back to register ids by `cases._label`; **Relabel** (`cases.relabel_by_name`) labels "other" cases by an exact, unique offence name |
 | How documents are cut for chunking | `core/config.py` → `CHUNK_SEGMENT_CHARS`, `CHUNK_OVERLAP_CHARS`, `CHUNK_PARALLEL`, `CHUNK_MAX_SPLITS` | Smaller parts = more calls, shorter answers |
 | How a document is read (headings, tables) | `core/cases.py` → `read_document` (`_docx_blocks`, `_HTMLText`, `_table_lines`), `heading_level`, `HeadingIndex` | Word files are read from their XML, so content controls, nested tables, merged cells, skipped grid columns and heading styles are kept; a numbered line counts as a heading only if its number follows on from the heading before it |
 | How the figures are checked | `core/cases.py` → `figures_from_text`, `check_figures` | Differences are only reported (⚠), never corrected. A bare duration (“57 months / NPP – 42 months”, as in the Manual's case tables) is read as the term; after “resentenced” only the new sentence is read |
@@ -143,6 +160,12 @@ receives it in `pipeline.run_remaining(..., case_db=...)` and keeps a snapshot o
   checked against that text but never silently changed (the case table applies only the cells the user changed).
   Within a database, ids are not reused after cases are deleted (`CaseDB.last_number`); after Clear or Replace they
   start again, which is harmless because a finished run keeps a snapshot of its cases (`Run.comparables`).
+* **The share of similar cases within the range is never a probability:** it is computed in code after the proposal
+  (`core/agreement.py`), never shown to an AI call, compares only a sentence for the offence being estimated, and is
+  always shown with `agreement.DISCLAIMER` (a comparison with these few cases, not the probability of the sentence
+  and not a sentencing practice; VSM 2.1, 5.2.9.3.1). No wording may call it a chance, likelihood, prediction or
+  current practice, and a weighted share must not be worded as a count. A written term of imprisonment is never
+  outranked by a lesser order named with it, and order names are matched as orders (not CCO conditions).
 * **Never resolve the Manual's ambiguities silently:** anything that depends on a `flag.*` item is a caution showing the
   flag, never an error; a point the Manual leaves open is a `Reading`, and a breach of the reading-dependent rules
   must hold on every reading to be an error. A check that does not depend on the category or a minimum must stay
@@ -157,6 +180,18 @@ receives it in `pipeline.run_remaining(..., case_db=...)` and keeps a snapshot o
   an answer against the offender (`facts.ADVERSE_VALUES`) is never applied without the user's tick; an open question
   is "unknown", never "no"; a required question is empty until answered; the user's own answers come first and survive
   a new sorting; an assumed value is marked as assumed in the AI calls and the report.
+* **A charge's own answers belong to it:** changing the charge (either input, or a new sorting) resets every
+  charge-specific answer whose question differs, and the charge's own maximum entries (`estimate.stale_charge_fields`).
+  Moving the offence date or period into another historic table, or into or out of one — in the form, through the
+  simple input's date, or by a new sorting — resets the maximum read from the old table
+  (`estimate.historic_table_changes`; the dates come from `estimate.form_dates`, which counts a period's end only
+  while "Committed over a period" is ticked). A change of offender type resets the historic fine and the company
+  maximum.
+* **A body corporate:** once the offender is one, no answer about a person (`facts.PERSON_ONLY_FIELDS`) is asked,
+  sent to an AI call, suggested or applied from a description; the charge's questions are filtered the same way
+  (`charge_questions(…, body_corporate=True)`), and so are the Manual's flags (`framework.PERSON_SCHEME_FLAG_WORDS`).
+* **Contempt:** only the checks based on the Sentencing Act (`checks.SENTENCING_ACT_CHECKS`, `_sentencing_act_based`)
+  become cautions; never the contempt's own printed maximum, the facts relied on, a sentence indication or an app rule.
 * **Suggestions:** `pipeline.step_confirm` rebuilds the case from `Run.entered` (the form as entered) plus the
   suggestions ticked now, so unticking one withdraws it.
 * **Form state:** widget keys are `"f_" + field` (and `"s_…"` for the simple input's answers); `streamlit_app.py`
@@ -169,7 +204,7 @@ receives it in `pipeline.run_remaining(..., case_db=...)` and keeps a snapshot o
 
 ```bash
 pip install pytest
-pytest                    # about 10–20 seconds, no key or network needed
+pytest                    # about a minute, no key or network needed
 ```
 `tests/fake_openai.py` replaces only the HTTP transport of the real OpenAI library, so the tests cover the real request
 format and Structured Outputs parsing. `tests/test_app.py` clicks through a whole run in Streamlit's test runner
@@ -179,4 +214,13 @@ database: reading Word and HTML tables, chunking (every case copied word for wor
 label and figure checks), saving and loading, and choosing the comparable cases. `tests/test_readings.py` covers the readings: among other things, that an
 unconfirmed scheme gives an error exactly when the sentence errs both with and without the scheme;
 `tests/test_readings_cross_product.py` compares the merged results with every combination of the open points, each
-built as a single reading.
+built as a single reading. `tests/test_agreement.py` covers which cases are compared and where each falls against the
+band; `tests/test_result_card.py` builds the result card from runs (with and without a case database, with errors,
+and with text that must be escaped). `tests/test_all_offences.py` covers every register offence (maxima, categories,
+scope, coverage); `tests/test_offence_schemes.py` covers the statutory schemes outside chapter 25 limb by limb, one
+family at a time (minimums and their facts, category conditions, standard sentences, life, maxima fixed by reference
+to another offence, bodies corporate, conditional maxima, licence orders, contempt); `tests/test_pipeline.py` runs
+each of test cases 4–13 end to end, checking that the scheme it was written for shows, that the hard check catches
+the fake service's first answer where that answer breaks the scheme's rule (and the revision corrects it), and for
+test cases 10 and 12 the rule's limits with hand-made proposals; and `tests/test_review_v2.py` holds the regression
+tests for the findings of the version 2.0 review (those about the form are at the end of `tests/test_app.py`).

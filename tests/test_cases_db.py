@@ -27,6 +27,8 @@ S17 = "crimes-act-s-17-recklessly-causing-serious-injury"
 S16 = "crimes-act-s-16-intentionally-causing-serious-injury"
 S18I = "crimes-act-s-18-intentionally-causing-injury"
 ASSAULT = "crimes-act-ss-31-1-320-at-common-law-assault"
+BURGLARY = "crimes-act-s-76-burglary"
+ARMED_ROBBERY = "crimes-act-s-75a-armed-robbery"
 
 
 def llm_with(fake):
@@ -236,8 +238,8 @@ def test_chunking_finds_every_case_word_for_word(kb, monkeypatch):
     by_cit = {c.citation.split(" (")[0]: c for c in report.cases}
     assert by_cit["R v Alder"].principal_offence_id == S17
     assert by_cit["DPP v Elm"].principal_offence_id == S16
-    assert by_cit["DPP v Kauri"].principal_offence_id is None          # burglary: not a chapter 25 label
-    assert by_cit["R v Juniper"].principal_offence_id is None          # armed robbery
+    assert by_cit["DPP v Kauri"].principal_offence_id == BURGLARY      # every chapter's offences are labels (2.0)
+    assert by_cit["R v Juniper"].principal_offence_id == ARMED_ROBBERY
     assert by_cit["R v Alder"].section == "Recklessly causing serious injury"
     # the figures check: the fake gives 60 months for "NPP 5 years 6 months"; nothing is changed
     assert "non-parole period recorded as 60 months, but the head sentence reads 66" in by_cit["DPP v Elm"].figures_note
@@ -245,6 +247,56 @@ def test_chunking_finds_every_case_word_for_word(kb, monkeypatch):
     # the fake leaves out the term of "12 months imprisonment": flagged, not filled in
     hazel = by_cit["R v Hazel"]
     assert hazel.head_sentence_months is None and "states a term of 12 months" in hazel.figures_note
+
+
+def test_chunking_calls_list_short_codes_for_the_chapters_chosen(kb):
+    """Guide step 20: each chunking call lists offence codes (not the long ids), and only for the chapters the user
+    says the document covers; a case for an offence of another chapter is labelled "other"."""
+    text = FIXTURE.read_text(encoding="utf-8")
+    fake = FakeOpenAI()
+    report = cs.chunk_document(llm_with(fake), kb, FIXTURE.name, text)
+    sent = str(fake.requests[-1]["body"]["input"])
+    code = next(c for c, oid in kb.offence_codes().items() if oid == BURGLARY)
+    assert f"{code}: {kb.offence_label(BURGLARY)}" in sent and BURGLARY not in sent
+    assert "### Chapter 27" in sent and "### Chapter 25" in sent and len(sent) < 40000
+    fake = FakeOpenAI()
+    narrow = cs.chunk_document(llm_with(fake), kb, FIXTURE.name, text, chapters=["25"])
+    sent = str(fake.requests[-1]["body"]["input"])
+    assert "### Chapter 25" in sent and "### Chapter 27" not in sent and code not in sent
+    by_cit = {c.citation.split(" (")[0]: c for c in narrow.cases}
+    assert by_cit["DPP v Kauri"].principal_offence_id is None and by_cit["R v Alder"].principal_offence_id == S17
+    assert len(narrow.cases) == len(report.cases)
+
+
+def test_a_label_given_as_a_code_an_id_or_a_unique_name(kb):
+    codes = kb.offence_codes()
+    allowed = {"codes": codes, "ids": set(codes.values())}
+    by_name = cs.unique_names(kb, codes.values())
+    code = next(c for c, oid in codes.items() if oid == BURGLARY)
+    assert cs._label(code, "", allowed, by_name) == BURGLARY
+    assert cs._label(f"[{code}]", "", allowed, by_name) == BURGLARY
+    assert cs._label(BURGLARY.upper(), "", allowed, by_name) == BURGLARY
+    assert cs._label("other", "Burglary", allowed, by_name) == BURGLARY            # its name, which one offence has
+    assert cs._label("99-99", "Something else", allowed, by_name) is None
+    shared = [n for n, k in Counter(kb.offence(o)["offence"] for o in codes.values()).items() if k > 1]
+    if shared:                                                                     # a name two offences share
+        assert cs._label("other", shared[0], allowed, by_name) is None
+
+
+def test_relabelling_cases_saved_by_version_1_by_their_names(kb):
+    db = cs.CaseDB()
+    db.add([record("", None, "DPP v Kauri [2020] VCC 9011", "burglary of a house"),
+            record("", None, "R v Unknown [2020] VCC 9012", "an offence the register does not name"),
+            record("", S17, "R v Alder [2020] VCC 9013", "glass")])
+    db.cases[0].principal_offence = "Burglary"
+    db.cases[0].offences = [{"name": "Burglary", "offence_id": None, "sentence_text": "", "sentence_months": None},
+                            {"name": "Theft", "offence_id": None, "sentence_text": "", "sentence_months": None}]
+    db.cases[1].principal_offence = "Unlawful assembly of geese"
+    assert cs.relabel_by_name(db, kb) == 1
+    assert db.cases[0].principal_offence_id == BURGLARY
+    assert [o["offence_id"] for o in db.cases[0].offences] == [BURGLARY, "crimes-act-s-74-theft"]
+    assert db.cases[1].principal_offence_id is None and db.cases[2].principal_offence_id == S17
+    assert cs.relabel_by_name(db, kb) == 0                                         # nothing left to do
 
 
 def test_numbered_headings_label_the_cases(kb):
@@ -478,15 +530,15 @@ def small_db(with_vectors=True):
     return db
 
 
-def test_the_same_offence_comes_first_and_other_offences_are_not_used():
+def test_the_same_offence_comes_first_and_other_offences_are_not_used(kb):
     db = small_db()
     q = np.array(fake_vector("glass hotel face scar"), dtype=np.float32)
     comp = cs.select_comparables(db, S17, query_vector=q, query_text="glass hotel face scar",
-                                 case_name="DPP v Moretti (test case 1)")
+                                 case_name="DPP v Moretti (test case 1)", related=cs.related_offences(kb, S17))
     ids = [e["id"] for e in comp.selected]
     assert comp.method.startswith("cosine") and comp.score_label == "similarity"
     assert ids[:2] == ["C1", "C2"]                       # same offence, most similar first
-    assert ids[2:] == ["C3", "C4"]                       # charged in that case; then a related injury offence
+    assert ids[2:] == ["C3", "C4"]                       # charged in that case; then an offence in the same section
     assert "C5" not in ids and "C7" not in ids           # burglary and common assault: never yardsticks here
     assert [(e["id"], e["reason"]) for e in comp.left_out] == [("C6", "its party names match the case being "
                                                                        "estimated")]

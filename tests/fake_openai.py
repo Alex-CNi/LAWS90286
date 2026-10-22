@@ -46,9 +46,11 @@ def fake_embed_batch(texts):
 
 class FakeOpenAI:
     def __init__(self, bad_first_proposal: bool = True, proposal_kind: str = "auto", chunk_fail_first: int = 0,
-                 chunk_max_cases: int = 0, wrong_months_for: str = "", extract_fail_first: int = 0):
+                 chunk_max_cases: int = 0, wrong_months_for: str = "", extract_fail_first: int = 0,
+                 first_kind: str = "auto"):
         self.bad_first_proposal = bad_first_proposal
         self.proposal_kind = proposal_kind
+        self.first_kind = first_kind                # "combination": the first (bad) answer is a combination sentence
         self.requests: list[dict] = []
         self.proposals = 0
         self.chunk_fail_first = chunk_fail_first    # the first N chunking calls fail (to test the retry)
@@ -143,7 +145,11 @@ class FakeOpenAI:
                                               intoxicated_by_liquor="unknown", intoxication_contributed="unknown",
                                               mental_impairment_evidence="unknown", cco_consent="unknown",
                                               presentence_report="unknown", cooperation="unknown",
-                                              prior_convictions="none", arising_from_driving="no"))
+                                              prior_convictions="none", arising_from_driving="no",
+                                              manslaughter_circumstance=(
+                                                  "single_punch" if "single punch" in narrative.lower() else "unknown"),
+                                              prosecution_notice="unknown", official_injured="unknown",
+                                              category_condition_met="unknown", conditional_condition_met="unknown"))
 
     def answer_StageAnalysis(self, text, body):
         items = self.ids_in(self.section(text, "Knowledge items"))
@@ -161,9 +167,16 @@ class FakeOpenAI:
         mnpp = re.search(r"Mandatory minimum non-parole period: (\d+) months", text)
         category = re.search(r"Category: Category (\d)", text)
         guilty = "Plea: guilty" in text
+        sso = re.search(r"Standard sentence scheme \(VSM 9\.2\): (?:applies|UNRESOLVED)", text)
+        statement = ("The sentence is below the standard sentence: the offending was a single, unplanned episode and "
+                     "the offender pleaded guilty early (F1, F2)." if sso and compliant else "")
+        if self.proposal_kind == "life":
+            return self._life_proposal(text, compliant, guilty, statement)
+        if "Offender: a body corporate" in text:
+            return self._fine_proposal(text, compliant, guilty)
         items = self.ids_in(self.section(text, "Knowledge items"))
         cases = self.ids_in(self.section(text, "Comparable cases from your case database"))
-        if mnpp or category:
+        if (mnpp or category) and not (self.first_kind == "combination" and not compliant):
             mn = int(mnpp.group(1)) if mnpp else 0
             term = max(48, mn * 2)
             npp = max(mn, int(term * 0.65)) if compliant else max(0, mn - 6)
@@ -182,22 +195,83 @@ class FakeOpenAI:
                                             cco_months=None, unpaid_hours=None, fine_penalty_units=None,
                                             conditions_reduced=None)
         aeo = "Intoxicated by liquor at the offence: yes; intoxication significantly contributed: yes" in text
+        orders = ([schemas.AncillaryOrder(type="alcohol_exclusion_order", status="mandatory", months=24,
+                                          details="two years", item_ids=["anc.alcohol_exclusion_order"])]
+                  if aeo and compliant else [])
+        licence = re.search(r"Mandatory licence order \(VSM 16\): mandatory: licence cancellation or disqualification "
+                            r"of at least (\d+) months", text)
+        held = re.search(r"licence: (victorian|other_jurisdiction|none)\b", text)
+        if licence and compliant:                  # the form the licence held requires (licence.form_by_licence_status)
+            form = {"victorian": "licence_cancellation_and_disqualification",
+                    "other_jurisdiction": "licence_disqualification_from_driving",
+                    "none": "licence_disqualification_from_obtaining"}.get(held.group(1) if held else "victorian")
+            orders.append(schemas.AncillaryOrder(type=form, status="mandatory", months=int(licence.group(1)) + 12,
+                                                 details="", item_ids=["order.licence_disqualification"]))
         return schemas.Proposal(
-            disposition_type=kind, term_months=term, npp_months=npp, npp_reason=None, cco=cco,
+            disposition_type=kind, term_months=term, npp_months=npp, npp_reason=None,
+            standard_sentence_statement=statement, npp_interests_of_justice_reason=None, cco=cco,
             fine_penalty_units=None, undertaking_months=None, conviction_recorded=True,
             special_reason=schemas.SpecialReason(found=False, limb=None, evidential_basis="", stated_in_writing=False),
             category2_exception=schemas.Category2Exception(relied_on=False, exception=None, evidential_basis=""),
             plea_reduced_sentence=guilty, s6aaa=notional,
             cooperation=schemas.Cooperation(less_severe_sentence=False, basis="none", announced=False, undertaking_recorded=False),
-            ancillary_orders=([schemas.AncillaryOrder(type="alcohol_exclusion_order", status="mandatory", months=24,
-                                                      details="two years", item_ids=["anc.alcohol_exclusion_order"])]
-                              if aeo and compliant else []),
+            ancillary_orders=orders,
             band=schemas.Band(disposition_types=[kind], term_low_months=max(1, term - 6), term_high_months=term + 6,
                               npp_low_months=npp, npp_high_months=(npp + 6) if npp else None,
                               cco_low_months=None, cco_high_months=None, main_uncertainties=["test"]),
             reasons=[schemas.ReasonParagraph(heading="Synthesis", text="Weighed together.", item_ids=items[:3] + ["made.up"],
                                              passage_ids=[], fact_ids=["F1"],
                                              case_ids=(cases[:1] + ["C998"]) if cases else [])],
+            assumptions=["test assumption"], unresolved=[], flags_shown=[],
+            revision_notes=["fixed the errors"] if compliant and self.proposals > 1 else [])
+
+    def _fine_proposal(self, text, compliant: bool, guilty: bool) -> schemas.Proposal:
+        """A body corporate: a fine (within the company maximum when compliant; 20,000 penalty units, above any
+        company maximum in the register's rows used by the tests, in the first answer)."""
+        units = 1500 if compliant else 20000
+        return schemas.Proposal(
+            disposition_type="fine", term_months=None, npp_months=None, npp_reason=None,
+            standard_sentence_statement="", npp_interests_of_justice_reason=None, cco=None,
+            fine_penalty_units=units, undertaking_months=None, conviction_recorded=True,
+            special_reason=schemas.SpecialReason(found=False, limb=None, evidential_basis="", stated_in_writing=False),
+            category2_exception=schemas.Category2Exception(relied_on=False, exception=None, evidential_basis=""),
+            plea_reduced_sentence=guilty,
+            s6aaa=schemas.NotionalSentence(stated=guilty, type="fine" if guilty else None, term_months=None,
+                                           npp_months=None, cco_months=None, unpaid_hours=None,
+                                           fine_penalty_units=(units + 500) if guilty else None,
+                                           conditions_reduced=None),
+            cooperation=schemas.Cooperation(less_severe_sentence=False, basis="none", announced=False,
+                                            undertaking_recorded=False),
+            ancillary_orders=[],
+            band=schemas.Band(disposition_types=["fine"], term_low_months=None, term_high_months=None,
+                              npp_low_months=None, npp_high_months=None, cco_low_months=None, cco_high_months=None,
+                              main_uncertainties=["test"]),
+            reasons=[schemas.ReasonParagraph(heading="Synthesis", text="Weighed together.", item_ids=[], passage_ids=[],
+                                             fact_ids=["F1"], case_ids=[])],
+            assumptions=["test assumption"], unresolved=[], flags_shown=[],
+            revision_notes=["fixed the errors"] if compliant and self.proposals > 1 else [])
+
+    def _life_proposal(self, text, compliant: bool, guilty: bool, statement: str) -> schemas.Proposal:
+        """Life imprisonment with a non-parole period (30 years when compliant; 20 years in the first answer)."""
+        npp = 360 if compliant else 240
+        return schemas.Proposal(
+            disposition_type="life_imprisonment", term_months=None, npp_months=npp, npp_reason=None,
+            standard_sentence_statement=statement, npp_interests_of_justice_reason=None, cco=None,
+            fine_penalty_units=None, undertaking_months=None, conviction_recorded=True,
+            special_reason=schemas.SpecialReason(found=False, limb=None, evidential_basis="", stated_in_writing=False),
+            category2_exception=schemas.Category2Exception(relied_on=False, exception=None, evidential_basis=""),
+            plea_reduced_sentence=guilty,
+            s6aaa=schemas.NotionalSentence(stated=guilty, type="life_imprisonment" if guilty else None,
+                                           term_months=None, npp_months=(npp + 24) if guilty else None, cco_months=None,
+                                           unpaid_hours=None, fine_penalty_units=None, conditions_reduced=None),
+            cooperation=schemas.Cooperation(less_severe_sentence=False, basis="none", announced=False,
+                                            undertaking_recorded=False),
+            ancillary_orders=[],
+            band=schemas.Band(disposition_types=["imprisonment", "life_imprisonment"], term_low_months=300,
+                              term_high_months=420, npp_low_months=240, npp_high_months=360, cco_low_months=None,
+                              cco_high_months=None, main_uncertainties=["test"]),
+            reasons=[schemas.ReasonParagraph(heading="Synthesis", text="Weighed together.", item_ids=[], passage_ids=[],
+                                             fact_ids=["F1"], case_ids=[])],
             assumptions=["test assumption"], unresolved=[], flags_shown=[],
             revision_notes=["fixed the errors"] if compliant and self.proposals > 1 else [])
 
@@ -239,8 +313,10 @@ class FakeOpenAI:
         cover = re.search(r"START on lines L(\d+)–L(\d+)", text)
         lo, hi = int(cover.group(1)), int(cover.group(2))
         shown = [(int(n), line) for n, line in re.findall(r"^L(\d+): (.*)$", self.section(text, "Lines shown"), flags=re.M)]
-        ids = dict(re.findall(r"^([a-z0-9-]+): (.+)$", self.section(text, "Offence ids you may use"), flags=re.M))
-        by_name = {v.lower(): k for k, v in ids.items()}
+        by_name: dict = {}                       # offence name -> its code ("27-06: Crimes Act 1958 s 75A — Armed robbery")
+        for code, name in re.findall(r"^(\d{2}-\d{2}): .*? — (.+)$", self.section(text, "Offence codes you may use"),
+                                     flags=re.M):
+            by_name.setdefault(name.strip().lower(), code)
         before = re.search(r"Headings in force before these lines: (.*?)\.\n", text).group(1)
         path0 = [] if before == "none" else before.split(" › ")
         starts = [n for n, line in shown if self.CITATION.search(line)]
@@ -300,7 +376,8 @@ class FakeOpenAI:
 
     def answer_SortedCase(self, text, body):
         d = self.section(text, "The description")
-        ids = re.findall(r"^([a-z0-9-]+): ", self.section(text, "Offence ids you may use"), flags=re.M)
+        listed = re.findall(r"^(\d{2}-\d{2}): .*? — (.+)$", self.section(text, "Offence codes you may use"), flags=re.M)
+        ids = [code for code, _ in listed]
         quotes: list = []
 
         def find(field, pattern):
@@ -309,9 +386,9 @@ class FakeOpenAI:
                 quotes.append(schemas.FieldQuote(field=field, quote=m.group(0)))
             return m
 
-        phrase = {oid: re.sub(r"^crimes-act-s-\d+[a-z]?(?:-\d+)?-", "", oid).replace("-", " ") for oid in ids}
-        offence_id = next((oid for oid in sorted(ids, key=lambda o: -len(phrase[o])) if find("offence_id", phrase[oid])),
-                          "unclear")
+        phrase = {code: name.strip().lower() for code, name in listed}
+        offence_id = next((c for c in sorted(ids, key=lambda c: -len(phrase[c]))
+                           if find("offence_id", r"\b" + re.escape(phrase[c]) + r"\b")), "unclear")
         m = find("court", r"(County|Supreme|Magistrates'|Children's) Court")
         court = f"{m.group(1)} Court" if m else "unclear"
         day = r"\b(\d{1,2}) (" + "|".join(self.MONTHS) + r") (\d{4})\b"
@@ -346,6 +423,16 @@ class FakeOpenAI:
         m = find("presentence_detention_days", r"(\d+) days in custody")
         days = int(m.group(1)) if m else None
         report = "ordered" if find("presentence_report", r"pre-sentence report has been ordered") else "unknown"
+        punch = "single_punch" if find("manslaughter_circumstance", r"(?:a|one) single (?:punch|strike)(?: \w+){1,3}") \
+            else "unknown"
+        notice = "yes" if find("prosecution_notice", r"(?:prosecution|DPP) (?:gave|filed|has given) (?:a )?notice"
+                                                     r"(?: \w+){0,4}") else "unknown"
+        injured = "yes" if find("official_injured", r"(?:officer|paramedic|worker) was injured(?: \w+){0,3}") \
+            else "unknown"
+        firearm = "yes" if find("category_condition_met", r"(?:armed with|carrying|had) a (?:firearm|gun|pistol)") \
+            else "unknown"
+        school = "yes" if find("conditional_condition_met", r"within 500 metres of a school") else "unknown"
+        company = "body_corporate" if find("offender_type", r"\b[A-Z][a-z]+ Pty Ltd\b") else "unclear"
         m = find("case_name", r"\b(?:DPP|R) v [A-Z][a-z]+")
         cco = "unknown"
         if "consent" not in d.lower():          # an invented answer: its words are not in the description
@@ -353,7 +440,7 @@ class FakeOpenAI:
             quotes.append(schemas.FieldQuote(field="cco_consent", quote="he consents to a community correction order"))
         outside = [f"The {c} is named." for c in ("Magistrates' Court", "Children's Court") if c.lower() in d.lower()]
         return schemas.SortedCase(
-            case_name=m.group(0) if m else "", offence_id=offence_id,
+            case_name=m.group(0) if m else "", offence_id=offence_id, offender_type=company,
             offence_as_described="an assault causing injury" if offence_id == "unclear" else phrase[offence_id],
             court=court, offence_date=offence_date, offence_date_end=offence_date_end,
             offence_year=int(year.group(1)) if (year and not offence_date) else None, plea=plea, plea_timing=timing,
@@ -361,7 +448,9 @@ class FakeOpenAI:
             mental_impairment_evidence="unknown", intoxicated_by_liquor=drunk, intoxication_contributed="unknown",
             previous_aeo="unknown", cooperation="unknown", victim_protected_worker=worker,
             offender_knew_or_reckless="unknown", accessory_only=accessory, presentence_detention_days=days,
-            presentence_report=report, cco_consent=cco, arising_from_driving="unknown", quotes=quotes,
+            presentence_report=report, cco_consent=cco, arising_from_driving="unknown",
+            manslaughter_circumstance=punch, prosecution_notice=notice, official_injured=injured,
+            category_condition_met=firearm, conditional_condition_met=school, quotes=quotes,
             outside_version_1=outside,
             not_stated=["Whether a psychiatrist's or psychologist's report is available",
                         "Whether the offender cooperated with the police"])

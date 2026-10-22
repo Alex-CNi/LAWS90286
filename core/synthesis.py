@@ -93,8 +93,10 @@ def propose(llm: LLM, kb: KnowledgeBase, retriever: Retriever, facts: ConfirmedF
             stages: dict[str, StageResult], query, comparables: Comparables | None = None
             ) -> tuple[ProposalResult, CallRecord | None]:
     """AI call 6."""
+    # The framework's own rules for this charge (e.g. its minimum's item) are always shown too, not left to ranking.
+    always = SYNTHESIS_ALWAYS + [i for i in fw.rule_items if not i.startswith("audit.") and i not in SYNTHESIS_ALWAYS]
     item_ids, quotes_for = select_items(kb, retriever, SYNTHESIS_STAGES, facts.case.offence_id, query,
-                                        config.ITEMS_FOR_SYNTHESIS, always=SYNTHESIS_ALWAYS)
+                                        config.ITEMS_FOR_SYNTHESIS, always=always, case=facts.case)
     result = ProposalResult(proposal=None, item_ids=item_ids)
     instructions = prompts.COMMON_RULES + "\n\n" + prompts.SYNTHESIS
     try:

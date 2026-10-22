@@ -7,7 +7,7 @@ from core.checks import run_hard_checks
 from core.facts import CaseInput, ConfirmedFacts
 from core.framework import build_framework
 
-S15A, S15B, S16, S17, S18I, S18R = config.IN_SCOPE_OFFENCES
+S15A, S15B, S16, S17, S18I, S18R = config.CAUSING_INJURY_OFFENCES
 
 
 def setup(kb, oid=S17, **case_kw):
@@ -28,7 +28,8 @@ def cco(months=18, conditions=None, commences="on_making"):
 
 def proposal(**kw):
     data = dict(
-        disposition_type="imprisonment", term_months=36, npp_months=24, npp_reason=None, cco=None,
+        disposition_type="imprisonment", term_months=36, npp_months=24, npp_reason=None,
+        standard_sentence_statement="", npp_interests_of_justice_reason=None, cco=None,
         fine_penalty_units=None, undertaking_months=None, conviction_recorded=True,
         special_reason=schemas.SpecialReason(found=False, limb=None, evidential_basis="", stated_in_writing=False),
         category2_exception=schemas.Category2Exception(relied_on=False, exception=None, evidential_basis=""),

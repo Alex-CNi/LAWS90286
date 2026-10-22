@@ -1,16 +1,84 @@
-# Streamlit settings for the app: the colours (theme) and server behaviour.
-# The colours are a dark navy scheme; app_pages/theme.py adds the gradient
-# behind the pages (a gradient cannot be set here).
+# Streamlit settings for the app: the look (theme) and server behaviour.
+# The theme is a dark navy palette set in Lato; app_pages/theme.py adds what
+# cannot be set here (the gradient behind the pages, the sidebar tiles, the
+# start bar, the cards and the result card).
 
 [theme]
 base = "dark"
-primaryColor = "#4d7cff"                 # buttons, ticks, sliders, the active tab, focus rings
+primaryColor = "#4d7cff"                 # accents: focus rings, ticks, sliders, the active tab
 backgroundColor = "#0b1a3a"              # navy (under the gradient)
 secondaryBackgroundColor = "#13254d"     # inputs, code, table headers
 textColor = "#e6ebf5"
 borderColor = "#2a3f72"
 linkColor = "#8fb0ff"
+baseRadius = "0.5rem"
+buttonRadius = "0.45rem"
+showWidgetBorder = true
 dataframeHeaderBackgroundColor = "#13254d"
+# Lato (SIL Open Font License, static/fonts/OFL.txt), served by the app itself so it needs no outside
+# request; the system sans-serif is used if it cannot load. Large headings are light (300), the rest bold.
+font = "Lato, sans-serif"
+headingFont = "Lato, sans-serif"
+headingFontWeights = [300, 700, 700, 700, 700, 700]
+headingFontSizes = ["3.25rem", "1.9rem", "1.4rem", "1.15rem", "1rem", "0.95rem"]
+metricValueFontWeight = 300
+
+# The font files (latin and latin-ext subsets): light, regular, italic and bold.
+[[theme.fontFaces]]
+family = "Lato"
+url = "app/static/fonts/lato-latin-300-normal.woff2"
+weight = 300
+style = "normal"
+unicodeRange = "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+
+[[theme.fontFaces]]
+family = "Lato"
+url = "app/static/fonts/lato-latin-400-normal.woff2"
+weight = 400
+style = "normal"
+unicodeRange = "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+
+[[theme.fontFaces]]
+family = "Lato"
+url = "app/static/fonts/lato-latin-400-italic.woff2"
+weight = 400
+style = "italic"
+unicodeRange = "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+
+[[theme.fontFaces]]
+family = "Lato"
+url = "app/static/fonts/lato-latin-700-normal.woff2"
+weight = 700
+style = "normal"
+unicodeRange = "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+
+[[theme.fontFaces]]
+family = "Lato"
+url = "app/static/fonts/lato-latin-ext-300-normal.woff2"
+weight = 300
+style = "normal"
+unicodeRange = "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF"
+
+[[theme.fontFaces]]
+family = "Lato"
+url = "app/static/fonts/lato-latin-ext-400-normal.woff2"
+weight = 400
+style = "normal"
+unicodeRange = "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF"
+
+[[theme.fontFaces]]
+family = "Lato"
+url = "app/static/fonts/lato-latin-ext-400-italic.woff2"
+weight = 400
+style = "italic"
+unicodeRange = "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF"
+
+[[theme.fontFaces]]
+family = "Lato"
+url = "app/static/fonts/lato-latin-ext-700-normal.woff2"
+weight = 700
+style = "normal"
+unicodeRange = "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF"
 
 [theme.sidebar]
 backgroundColor = "#0a1634"              # a darker navy for the sidebar
@@ -21,6 +89,8 @@ borderColor = "#24396b"
 [server]
 # Uploads: a case narrative (small), documents of case summaries and saved case databases (larger), in MB.
 maxUploadSize = 50
+# Serves the static/ folder (the font files) at app/static/.
+enableStaticServing = true
 
 [browser]
 gatherUsageStats = false

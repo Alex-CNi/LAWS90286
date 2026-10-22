@@ -1,8 +1,0 @@
-{
-  "model": "text-embedding-3-large",
-  "dimensions": 1024,
-  "kb_fingerprint": "10a8016e3c5439fc",
-  "built_at": "2026-10-21 09:00",
-  "items": 801,
-  "chunks": 888
-}

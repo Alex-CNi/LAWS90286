@@ -5,17 +5,25 @@ app_pages/about.py — WHAT THE APP DOES, HOW, AND ITS LIMITS (static text).
 import streamlit as st
 
 from app_pages.common import get_kb, get_retriever
+from app_pages.theme import hero
 from core import config
+from core.checks import OTHER_CHECKS, READING_CHECKS
 
 kb = get_kb()
+HARD_CHECKS = len(READING_CHECKS) + len(OTHER_CHECKS)
+STANDARDS = len(kb.audit_items("critic"))
 
-st.title("About and method")
+hero("About and method", small=True)
 
 st.markdown(f"""
 ### The task
-Estimate an **indicative sentence** for one charge of a Victorian causing-injury offence (Crimes Act 1958 ss 15A,
-15B, 16, 17 or 18), for an adult offender sentenced in the County Court or Supreme Court, from the facts the user
-gives. The only legal source is the **{config.MANUAL_NAME}** (version published {config.MANUAL_VERSION_DATE}),
+Estimate an **indicative sentence** for one charge of any Victorian offence in the Manual's offence register
+(chapters 21–34), for an adult offender or a body corporate sentenced in the County Court or Supreme Court, from the
+facts the user gives. Each offence's statutory scheme, as the Manual states it, is checked in code: the maximum
+(including life, a conditional maximum and a maximum fixed by reference to another offence), Category 1/2, mandatory
+minimum non-parole periods, the standard sentence scheme, mandatory licence orders, the rules for a body corporate and
+for contempt. The facts a scheme turns on are asked in Step 1 (“Questions for this charge”); what the app does not
+check (the offender-status schemes, the Magistrates' Court) it says, rather than guessing. The only legal source is the **{config.MANUAL_NAME}** (version published {config.MANUAL_VERSION_DATE}),
 extracted into a knowledge base of {len(kb.meta)} items with verbatim quotes, {len(kb.chunks)} passages and an
 offence register of {len(kb.offences)} offences. The app does not decide guilt.
 
@@ -24,10 +32,10 @@ offence register of {len(kb.offences)} offences. The app does not decide guilt.
 |---|---|---|
 | 1. Case | **Simple:** a description in your own words and a few optional answers; an AI call sorts the description into the form's questions — only what it states, each answer with the words that show it; an answer that counts against the offender is used only if you tick it — and you supply any of the charge, court, date, plea and age it leaves open. **Detailed:** the full form and the narrative (the charge, court, date, plea and ages start empty). Then checks of scope, dates and ages before AI call 1 | code (+ **1 AI call** to sort a simple description) |
 | 2. Facts | The facts are extracted, each with its basis (admitted / evidence / alleged / disputed); missing facts become stated assumptions; the user confirms or edits them | **AI call 1** |
-| 3. Framework | Maximum at the offence date, Category 1/2, mandatory minimum non-parole periods, what dispositions are open; the knowledge base's gates; the Manual's own problems (flags) | code (if-then rules) |
+| 3. Framework | Maximum at the offence date, Category 1/2, mandatory minimum non-parole periods, the standard sentence scheme, mandatory licence orders, the rules for a body corporate, what dispositions are open; the knowledge base's gates; the Manual's own problems (flags) | code (if-then rules) |
 | 4. Analysis | Four analyses — gravity of the offending, the offender, purposes and policy, current practice and comparable material — each shown the Manual items most similar to the facts (cosine similarity once the search index is built; keyword ranking until then, or if the key cannot use embeddings) and citing them. The current-practice analysis is also given the most similar cases from your case database | **AI calls 2–5** (parallel) |
 | 5. Proposal | One formulated sentence and an indicative band, by instinctive synthesis, with reasons citing the Manual | **AI call 6** |
-| 6. Checks | 19 hard checks in code (maximum, Category 1/2, minimums, non-parole period, CCO limits, conviction, s 6AAA, ancillary orders …), then an audit of the reasoning against 34 standards from the Manual | code + **AI call 7** |
+| 6. Checks | {HARD_CHECKS} hard checks in code (maximum, Category 1/2, minimums, non-parole period, the standard sentence scheme, CCO limits, conviction, s 6AAA, fines and bodies corporate, ancillary and licence orders …), then an audit of the reasoning against {STANDARDS} standards from the Manual | code + **AI call 7** |
 | 6a. Revision | If any check or audit finding is an error: the proposal is revised, re-checked and re-audited (once) | **AI calls 8–9** |
 | 7. Report | Band, sentence, reasons, citations (section, page, footnote authorities), assumptions, cautions, flags, the Manual's edition and disclaimer; Word and Markdown downloads; the run log | code |
 
@@ -51,15 +59,29 @@ are run under each of them:
 ### The case database: comparable cases
 On the **Case database** page you can upload documents of sentencing case summaries (for example the Judicial
 College's *Sentencing Manual case summaries*). The AI splits each document into individual cases and labels each by
-the offences charged; the code copies each case's text from your document word for word and checks the labels and
-figures. In each estimate, the confirmed facts are compared with every case by **cosine similarity** of their
-embeddings; the most similar cases ({config.CASES_FOR_COMPARISON} at most; app policy: the same offence first, then
-related injury offences, leaving out a case that looks like the case being estimated, any case you leave out, and any
-other listing of the same decision) go to
+the offences charged (any offence in the Manual's register, or “other”); the code copies each case's text from your
+document word for word and checks the labels and figures. In each estimate, the confirmed facts are compared with
+every case by **cosine similarity** of their embeddings; the most similar cases ({config.CASES_FOR_COMPARISON} at most;
+app policy: the same offence first, then cases in which it was also charged, then offences in the same section of the
+register, leaving out a case that looks like the case being estimated, any case you leave out, and any other listing
+of the same decision) go to
 the current-practice analysis, the proposal and the audit. They are **comparable cases only** — yardsticks of current
 sentencing practice, used as the Manual says comparable cases are used — never a source of law, and the report lists
 them with the ones the reasoning relied on. The AI's figures for each case are checked against the case's own text;
 anything that does not match is shown for you to check, never silently changed.
+
+### The result card and the share of similar cases within the range
+The estimate is shown first in a result card: the formulated sentence in large type, the indicative range, the
+framework and the results of the checks. With a case database, the card also places each of the most similar cases
+against the range (by its sentence for this offence) and shows the share of them sentenced within it, weighted by
+cosine similarity. That figure is worked out in code after the proposal and is never shown to the AI, so it cannot
+drive the estimate. It is **a comparison with these few cases from your case database — not the probability that a
+court will impose the sentence, and not a sentencing practice**: similarity measures how alike the cases' texts are,
+there is no single correct sentence (VSM 2.1), and a small number of cases cannot show a sentencing practice or define a
+range (VSM 5.2.9.3.1). The large figure on the card is the formulated sentence within the indicative range; the
+estimate is the range, shown with its main uncertainties and assumptions. App policy: only a sentence for the offence
+being estimated is compared (a case's individual sentence for it, or its head sentence when it was the only charge);
+no percentage is shown from fewer than {config.AGREEMENT_MIN_CASES} cases.
 
 ### How the class tools are used
 * **If-then rules (Lab 1):** the framework, the gates and the hard checks are code, so the statutory limits are
@@ -80,16 +102,21 @@ Model settings are in the sidebar; if a model is not available to your key, the 
 ### Limitations
 * Only the Manual: where the Manual is out of date, silent or inconsistent, so is the app; the report shows the
   Manual's flags rather than resolving them. The Manual gives no warranty of accuracy.
-* Version 1: one charge, adults, higher courts, six offences. Not covered: totality across charges or with an
-  existing sentence, cumulation, Magistrates' Court limits, youth justice centre orders, CSTOs, RTOs, DATOs,
-  indefinite sentences.
+* One charge, an adult offender or a body corporate, the higher courts. Not covered: totality across charges or with
+  an existing sentence, cumulation, Magistrates' Court limits, the offender-status schemes (serious offender,
+  continuing criminal enterprise: a caution when prior convictions are not “none”, for chapters 21, 22 and 24–28),
+  Commonwealth offences, youth justice centre orders, CSTOs, RTOs, DATOs, indefinite sentences. Historic offending
+  under a penalty table the Manual holds only as text needs the maximum (term and/or fine) entered from the table.
+* Contempt: the hard checks based on the Sentencing Act give cautions (it does not apply in its entirety, VSM
+  29.5.2); the contempt's own printed maximum, the facts relied on and a sentence indication still give errors.
 * The AI's reasoning can still be wrong. The hard checks catch breaches of mandatory rules; the audit catches some
   reasoning errors; neither can guarantee the evaluative judgment.
 * The simple input uses only what your description states: every question it leaves open is treated as unknown, so
   the estimate rests on more assumptions. For a precise estimate, use the detailed input (or check the answers there).
 * Comparable cases come from what the Manual describes and, if you add them, your case database, which is only as
   good as the summaries and the AI's labels (check them on the Case database page). Similar wording is not legal
-  similarity, and a head sentence may reflect several charges.
+  similarity, and a head sentence may reflect several charges. The share of similar cases within the range is a check
+  of the estimate against those cases, never the chance of a particular sentence.
 * A slow model call can take several minutes: each call waits up to 7 minutes and is retried once.
 * Text marked “(app policy)” is how the app handles a point the Manual does not settle; it is not the Manual's law.
 """)

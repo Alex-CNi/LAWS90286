@@ -30,10 +30,10 @@ import numpy as np
 
 from core import config
 from core.audit import AuditOutcome, run_audit
-from core.cases import CaseDB, Comparables, case_query_text, select_comparables
+from core.cases import CaseDB, Comparables, case_query_text, related_offences, select_comparables
 from core.checks import run_hard_checks
-from core.facts import (SORT_STEP, CaseInput, ConfirmedFacts, check_quote, extract_facts, is_adverse,
-                        suggestions_for_unknowns, verify_quotes)
+from core.facts import (CHARGE_SPECIFIC_FIELDS, SORT_STEP, CaseInput, ConfirmedFacts, check_quote, extract_facts,
+                        is_adverse, suggestions_for_unknowns, verify_quotes)
 from core.framework import Framework, build_framework
 from core.kb import KnowledgeBase
 from core.llm import LLM, CallRecord, LLMError
@@ -135,10 +135,13 @@ def step_extract(run: Run, llm: LLM, kb: KnowledgeBase) -> None:
     run.log(record)
     run.extraction = extraction
     run.fact_rows = verify_quotes(extraction, run.case.narrative)
-    run.suggestions = suggestions_for_unknowns(run.case, extraction)
-    # Suggested values that count against the offender start unticked. With the simple input every suggestion
-    # starts unticked: the open questions were left open because the description gives no words for them.
-    run.suggestion_choices = {f: not run.simple and not is_adverse(f, v) for f, v in run.suggestions.items()}
+    run.suggestions = suggestions_for_unknowns(run.case, extraction, kb)
+    # Suggested values that count against the offender start unticked, and so does any answer to a charge's own
+    # question ("no" or "neither" too: it settles the fact a minimum, a category or a higher maximum turns on, and
+    # removes the reading "if proved"). With the simple input every suggestion starts unticked: the open questions
+    # were left open because the description gives no words for them.
+    run.suggestion_choices = {f: not run.simple and not is_adverse(f, v) and f not in CHARGE_SPECIFIC_FIELDS
+                              for f, v in run.suggestions.items()}
 
 
 def step_confirm(run: Run, kb: KnowledgeBase, fact_rows: list[dict], accepted: dict) -> None:
@@ -206,7 +209,7 @@ def step_queries(run: Run, llm: LLM, kb: KnowledgeBase, retriever: Retriever, ca
         run.comparables = select_comparables(
             case_db, run.facts.case.offence_id, query_vector=vector if isinstance(vector, np.ndarray) else None,
             query_text=texts.get("cases", ""), case_name=run.case.case_name, narrative=run.case.narrative,
-            exclude_ids=exclude_case_ids)
+            exclude_ids=exclude_case_ids, related=related_offences(kb, run.facts.case.offence_id))
         if case_db.usable() and not case_db.has_vectors():
             missing = sum(1 for c in case_db.usable() if c.id not in case_db.vectors)
             run.messages.append(f"Comparable cases were ranked by keywords: {missing} case(s) in use have no "

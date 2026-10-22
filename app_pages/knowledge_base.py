@@ -4,7 +4,7 @@ app_pages/knowledge_base.py — SEARCH AND BROWSE THE KNOWLEDGE BASE.
   * Search: cosine similarity over the stored vectors when an index exists and
     a key is entered (the query is embedded with the user's key); otherwise
     keyword ranking. Results show each item's statement and verbatim quotes.
-  * The offence register rows for the in-scope offences.
+  * The offence register rows for one chapter of Part E.
   * Build the search index with your own key (if it has not been built).
 This page makes no AI calls (only an embeddings request for a search).
 """
@@ -15,6 +15,7 @@ import pandas as pd
 import streamlit as st
 
 from app_pages.common import get_kb, get_keyword_retriever, get_retriever, has_key, make_llm, show_citations
+from app_pages.theme import hero
 from core import config
 from core.llm import LLMError
 from core.retrieval import build_index
@@ -22,26 +23,34 @@ from core.retrieval import build_index
 kb = get_kb()
 retriever = get_retriever()
 
-st.title("Knowledge base")
-st.caption(f"Everything the app knows about the law: {len(kb.meta)} items and {len(kb.chunks)} passages extracted "
-           f"from the {config.MANUAL_NAME} (version of {config.MANUAL_VERSION_DATE}), and the offence register "
-           f"({len(kb.offences)} Victorian offences). Search: {retriever.description}.")
+hero("What does the Manual say?",
+     f"Everything the app knows about the law: {len(kb.meta)} items and {len(kb.chunks)} passages extracted from the "
+     f"{config.MANUAL_NAME} (version of {config.MANUAL_VERSION_DATE}), and the offence register ({len(kb.offences)} "
+     f"Victorian offences). Search: {retriever.description}.")
 
-# ── Search ──────────────────────────────────────────────────────────────────
+# ── Search: the white bar (words, then the offence chapter), and the filters under it ──
 FILES = sorted({m["file"] for m in kb.meta.values()})
 STAGES = list(kb.stage_map)
-c1, c2, c3 = st.columns([3, 2, 2])
-query = c1.text_input("Search (e.g. “glassing”, “special reasons”, “non-parole period with a CCO”)")
-files = c2.multiselect("Kinds", FILES, default=[f for f in FILES if f not in ("intake", "audit")])
-stages = c3.multiselect("Stages", STAGES)
-linked_only = st.checkbox("Only items linked to the version 1 offences or general items", value=True)
+st.session_state.setdefault("kb_chapter", "25")     # the estimate page's offence panel can open another chapter
+with st.container(key="search_bar"):
+    c1, c2, c3 = st.columns([6.2, 3.2, 0.8], gap="small", vertical_alignment="center")
+    query = c1.text_input("Search the knowledge base", key="kb_query", label_visibility="collapsed",
+                          placeholder="Search the Manual — e.g. glassing, special reasons, parity")
+    chapter = c2.selectbox("Offence chapter (Part E)", config.PART_E_CHAPTERS, key="kb_chapter",
+                           format_func=kb.chapter_title, label_visibility="collapsed")
+    c3.button("Search", key="kb_go", help="Search")
+c1, c2, c3 = st.columns([2, 2, 3], vertical_alignment="bottom")
+files = c1.multiselect("Kinds", FILES, default=[f for f in FILES if f not in ("intake", "audit")])
+stages = c2.multiselect("Stages", STAGES)
+chapter_offences = [o for o in config.IN_SCOPE_OFFENCES if kb.offence_chapter(o) == chapter]
+linked_only = c3.checkbox("Only items linked to this chapter's offences, or general items", value=True)
 
 if query:
     ids = [i for i, m in kb.meta.items() if m["file"] in files and (not stages or set(m.get("stage") or []) & set(stages))
            and m.get("jurisdiction") != "cth"]
     if linked_only:
         ids = [i for i in ids if not kb.meta[i].get("offence_ids")
-               or set(kb.meta[i]["offence_ids"]) & set(config.IN_SCOPE_OFFENCES)]
+               or set(kb.meta[i]["offence_ids"]) & set(chapter_offences)]
     q = query
     if retriever.uses_vectors and has_key():
         cache = st.session_state.setdefault("query_vectors", {})     # embed each search once per session
@@ -68,10 +77,10 @@ if query:
     for cid, score in passages:
         show_citations(kb, [], [cid], label=f"{kb.chunks[cid]['section']} {kb.chunks[cid].get('title', '')} · score {score:.2f}")
 
-# ── The offence register (version 1 offences) ──────────────────────────────
-st.subheader("Offence register — version 1 offences")
+# ── The offence register (the chosen chapter) ───────────────────────────────
+st.subheader(f"Offence register — chapter {kb.chapter_title(chapter)}")
 rows = []
-for oid in config.IN_SCOPE_OFFENCES:
+for oid in chapter_offences:
     o = kb.offence(oid)
     m = (o.get("maxima") or [{}])[0]
     rows.append({"Offence": kb.offence_label(oid), "Maximum": m.get("text"), "From": m.get("from"),
