@@ -1,6 +1,6 @@
 # Victorian Sentencing Estimator
 
-LAWS90286 Assignment 2 — an AI-powered tool that estimates an **indicative sentence** for a Victorian offence in the
+LAWS90286 Assignment 2 — an AI-powered tool that estimates an indicative sentence for a Victorian offence in the
 *Victorian Sentencing Manual*'s offence register (chapters 21–34) from the facts of a case, reasoning only from the
 Manual (4th ed, Judicial College of Victoria, version published 21 September 2026) and citing it.
 
@@ -374,3 +374,4 @@ the user uploads, used only as comparable cases. The Judicial College gives no w
 This tool is for study; it is not legal advice.
 
 Code layout and how to change things: see **[CODE_GUIDE.md](CODE_GUIDE.md)**.
+
