@@ -25,3 +25,5 @@ page = st.navigation([
     st.Page("app_pages/about.py", title="About and method", icon=":material/info:"),
 ])
 page.run()
+
+
