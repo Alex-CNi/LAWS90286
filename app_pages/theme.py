@@ -86,10 +86,11 @@ CSS = """
 .vse-hero p { color: ${muted}; font-size: 1.02rem; max-width: 62rem; margin: 0 0 1.2rem; line-height: 1.55; }
 .vse-hero.small h1 { font-size: clamp(1.9rem, 3.2vw, 2.7rem); margin-top: 0.6rem; }
 
-/* ── 4. The white start bar with pill-shaped choices and the blue arrow ──── */
+/* ── 4. The white start bars with pill-shaped choices (the search bar ends in a blue button) ──── */
 .st-key-hero_bar, .st-key-search_bar {
   background: #ffffff; border-radius: 5px; padding: 0.5rem 0 0.5rem 1.1rem;
   box-shadow: 0 14px 40px rgba(2, 8, 30, 0.45); margin: 0.4rem 0 1.8rem; container-type: inline-size; }
+.st-key-hero_bar { padding-right: 1.1rem; }
 .st-key-hero_bar [data-testid="stWidgetLabel"], .st-key-search_bar [data-testid="stWidgetLabel"] { display: none; }
 /* the wide first field: no border, grey text */
 .st-key-hero_bar [data-testid="stColumn"]:first-child [data-testid="stSelectbox"] [role="group"],
@@ -136,10 +137,9 @@ CSS = """
   flex-wrap: nowrap; }
 .st-key-hero_bar [data-testid="stColumn"]:nth-child(1), .st-key-search_bar [data-testid="stColumn"]:nth-child(1) {
   min-width: 12rem; }
-.st-key-hero_bar [data-testid="stColumn"]:nth-child(2) { min-width: max-content; }
+.st-key-hero_bar [data-testid="stColumn"]:nth-child(2) { min-width: max-content; flex: 0 0 max-content; }
 .st-key-search_bar [data-testid="stColumn"]:nth-child(2) { min-width: 13rem; }
-.st-key-hero_bar [data-testid="stColumn"]:last-child, .st-key-search_bar [data-testid="stColumn"]:last-child {
-  min-width: 4rem; flex: 0 0 4rem; }
+.st-key-search_bar [data-testid="stColumn"]:last-child { min-width: 4rem; flex: 0 0 4rem; }
 @container (max-width: 47rem) {
   .st-key-hero_bar [data-testid="stHorizontalBlock"], .st-key-search_bar [data-testid="stHorizontalBlock"] {
     flex-wrap: wrap; row-gap: 0.45rem; padding-right: 1.1rem; }
@@ -150,6 +150,7 @@ CSS = """
   .st-key-hero_bar [data-testid="stButtonGroup"] button p { white-space: normal; line-height: 1.15; font-size: 0.95rem; }
   .vse-go, .st-key-search_bar [data-testid="stBaseButton-secondary"] { margin: 0.1rem 0 0.2rem; border-radius: 5px;
     height: 2.9rem; }
+  .st-key-hero_bar [data-testid="stHorizontalBlock"] { padding-right: 0; }
 }
 @media (max-width: 640px) { .st-key-areas [role="tablist"]::before { display: none; } .st-key-areas { padding: 0.5rem 1rem 1.2rem; } }
 
