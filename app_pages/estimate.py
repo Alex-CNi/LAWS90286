@@ -53,7 +53,7 @@ import streamlit as st
 from app_pages.common import (BADGE, get_case_db, get_kb, get_retriever, has_key, make_llm, show_call_log,
                               show_case_citations, show_citations, show_comparables, show_results)
 from app_pages.result_card import show_result_card
-from app_pages.theme import anchor, go_button, hero, steps_row
+from app_pages.theme import anchor, hero, steps_row
 from core import config
 from core.checks import months_text
 from core.coverage import RELATIONS_USER_SUPPLIED, charge_questions, relative_entry
@@ -796,20 +796,18 @@ hero("What sentence are you estimating?",
      f"{config.MANUAL_VERSION_DATE}). Each offence's statutory scheme is checked in code; what the app does not check, it "
      f"says. An indicative estimate — not a prediction and not legal advice.")
 
-# The start bar: a test case (or your own case), how to enter it, and the arrow down to Step 1.
+# The start bar: a test case (or your own case) and how to enter it.
 TEST_CASES = sorted((p.name for p in config.TEST_CASES_DIR.glob("*.json")),      # tc1, tc2, … tc13
                     key=lambda n: (int(m.group(1)) if (m := re.match(r"tc(\d+)", n)) else 10**6, n))
 INPUT_MODES = {"Simple": "Simple — describe it", "Detailed": "Detailed — every question"}
 with st.container(key="hero_bar"):
-    c1, c2, c3 = st.columns([4.6, 4.6, 0.8], gap="small", vertical_alignment="center")
+    c1, c2 = st.columns([1, 1], gap="small", vertical_alignment="center")
     c1.selectbox("Load a test case (optional; it opens the detailed input)", ["—"] + TEST_CASES,
                  key="test_case_choice", on_change=load_test_case, label_visibility="collapsed",
                  format_func=lambda n: "Load a test case (optional)" if n == "—"
                  else json.loads((config.TEST_CASES_DIR / n).read_text())["title"])
     c2.segmented_control("How do you want to enter the case?", list(INPUT_MODES), key="f_input_mode", required=True,
                          format_func=INPUT_MODES.get, label_visibility="collapsed")
-    with c3:
-        go_button("#step-1", "Go to Step 1 — the case")
 st.caption("**Simple:** describe the case in your own words; an AI call sorts the description into the questions and "
            "you answer the few it leaves open. **Detailed:** answer every question yourself — the most accurate "
            "estimate. Both fill the same form, so you can start simple and refine the answers in the detailed form.")
