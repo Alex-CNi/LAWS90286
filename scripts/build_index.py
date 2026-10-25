@@ -1,6 +1,24 @@
+"""
+scripts/build_index.py — BUILD THE SEARCH INDEX ONCE, DURING DEVELOPMENT.
 
-# scripts/build_index.py: one-off dev script that embeds knowledge/ and the Manual into index/ (commit it); needs OPENAI_API_KEY or .env, costs about US$0.06.
-# Re-run after changing knowledge/ or the embedding settings, or the app falls back to keyword search.
+Run from the repository folder:
+
+    python scripts/build_index.py
+
+What it does
+  * Reads your own OpenAI key from the OPENAI_API_KEY environment variable, or
+    from a ".env" file in the repository folder (see .env.example). .gitignore
+    keeps .env out of GitHub, so the key is never published.
+  * Embeds every knowledge item (801) and every Manual passage (888) with the
+    model in core/config.py (about 450,000 tokens; roughly US$0.06).
+  * Saves the vectors to index/vectors.npz and index/meta.json. Commit those two
+    files: the deployed app loads them, and only embeds each run's short search
+    queries, with the USER's key.
+
+Re-run it whenever knowledge/ changes or you change EMBEDDING_MODEL or
+EMBEDDING_DIMENSIONS (the app detects a stale index and falls back to keyword
+ranking until you do).
+"""
 
 import os
 import sys

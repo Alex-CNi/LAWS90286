@@ -19,7 +19,7 @@ from pathlib import Path
 # 0. App identity and source
 # ─────────────────────────────────────────────────────────────────────────────
 APP_TITLE = "Victorian Sentencing Estimator"
-APP_VERSION = "2.1"
+APP_VERSION = "2.2"
 
 # The only legal source. Shown on every report (the Manual asks for its edition
 # and disclaimer to accompany anything built from it).

@@ -896,3 +896,44 @@ def test_no_minor_involvement_question_for_a_body_corporate(fake):
     at.radio(key="f_offender_type").set_value("body_corporate").run()
     assert not at.exception, at.exception
     assert not any(s.key == "f_minor_involvement_proved" for s in at.selectbox)
+
+
+# ── version 2.2: the simple input runs every AI call from one button ──
+def test_simple_input_runs_everything_from_one_button(fake):
+    """The simple input's Estimate button sorts the description, extracts the facts, confirms them as extracted
+    (no suggestion applied), works out the framework and runs the rest — no further click. The run's log holds
+    the sorting call and every later call; the detailed input's buttons are not shown."""
+    at = with_key()
+    assert button(at, "Extract the facts only").disabled                             # the step-by-step way waits
+    button(at, "Use an example").click().run()
+    button(at, "Estimate — every AI call").click().run()
+    assert not at.exception, at.exception
+    run = at.session_state.run
+    assert run.finished and run.simple and run.current.proposal.proposal
+    assert run.facts.applied_suggestions == {}                                        # nothing ticked
+    assert run.facts.case.prior_convictions == "unknown"                              # adverse answers wait for a tick
+    steps = [c.step for c in run.calls]
+    assert steps[0] == "Sorting the description" or "sort" in steps[0].lower()
+    assert len(run.calls) >= 8                                                        # sorting + 7 (+ a revision)
+    assert at.session_state.form_shadow["offence_id"] == "crimes-act-s-17-recklessly-causing-serious-injury"
+    assert any("Indicative range" in h.value or "range" in h.value.lower() for h in at.html)  # the result card
+    # Steps 2 and 3 are still there for review and re-confirmation
+    assert any(b.label.startswith("Confirm the facts") for b in at.button)
+
+
+def test_simple_input_stops_when_the_description_leaves_a_required_answer_open(fake):
+    at = with_key()
+    at.text_area(key="f_narrative").input("The offender pleaded guilty to theft in the County Court. He stole a bicycle "
+                                          "from outside a shop and sold it the same day. He is remorseful.").run()
+    button(at, "Estimate — every AI call").click().run()
+    assert not at.exception, at.exception
+    assert at.session_state.get("run") is None
+    assert any("does not state the charge, the date" in e.value for e in at.error)
+    assert at.session_state.sorted is not None                                        # the sorting is kept
+    assert at.session_state.form_shadow["plea"] == "guilty"                           # what it found is in the form
+    at.selectbox(key="s_offence").set_value("crimes-act-s-74-theft").run()
+    at.number_input(key="s_age").set_value(30).run()
+    at.date_input(key="s_date").set_value(date(2024, 3, 14)).run()
+    button(at, "Estimate — every AI call").click().run()
+    assert not at.exception, at.exception
+    assert at.session_state.run.finished

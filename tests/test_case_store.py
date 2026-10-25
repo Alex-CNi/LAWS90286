@@ -185,3 +185,18 @@ def test_a_committed_json_database_seeds_the_files_once(isolated_case_store):
         assert any(m.label == "Cases" and str(m.value) == "7" for m in at2.metric)
     finally:
         get_committed_case_db.clear()
+
+
+def test_the_page_says_which_cases_an_estimate_would_use(isolated_case_store):
+    from tests.test_cases_db import S17, S16, BURGLARY
+    at = new_app()
+    at.switch_page("app_pages/cases.py").run()
+    at.session_state["case_db"] = small_db(with_vectors=True)
+    at.run()
+    at.selectbox(key="cdb_check_charge").set_value(S17).run()
+    assert not at.exception, at.exception
+    assert any("would be compared" in s.value for s in at.success)
+    at.selectbox(key="cdb_check_charge").set_value(BURGLARY).run()           # no burglary cases: none used
+    assert any("No case in use would reach" in e.value for e in at.error)
+    at.selectbox(key="cdb_check_charge").set_value(S16).run()               # same section as s 17: the related tier
+    assert any("would be compared" in s.value for s in at.success)

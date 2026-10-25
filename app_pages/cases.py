@@ -39,8 +39,8 @@ from app_pages.common import (case_db_changed, get_case_db, get_committed_case_d
                               show_case)
 from app_pages.theme import hero
 from core import config
-from core.cases import (CaseDB, case_labels, check_figures, chunk_document, read_document, relabel_by_name,
-                        relabel_case, segments, set_principal_sentence, to_lines)
+from core.cases import (CaseDB, case_labels, check_figures, chunk_document, read_document, related_offences,
+                        relabel_by_name, relabel_case, segments, set_principal_sentence, to_lines)
 from core.llm import LLMError
 
 kb = get_kb()
@@ -76,6 +76,39 @@ if db.cases:
     with st.expander("Cases by principal offence"):
         st.dataframe([{"Principal offence": name, "Cases": n} for name, n in db.counts_by_offence(kb)],
                      hide_index=True, width="stretch")
+    with st.expander("Which of these cases would an estimate use? Check a charge"):
+        st.caption("The estimate uses, in this order: cases whose principal offence is the charge; cases in which the "
+                   "charge was also one of the offences; then cases for another offence in the same section of the "
+                   "Manual's register (app policy). Cases for any other offence, cases marked “Other offence”, and "
+                   "cases unticked in the table are never used.")
+        pick = st.selectbox("Charge", config.IN_SCOPE_OFFENCES, key="cdb_check_charge",
+                            format_func=lambda o: NAME_OF.get(o, o))
+        usable = db.usable()
+        same = [c for c in usable if c.principal_offence_id == pick]
+        also = [c for c in usable if c.principal_offence_id != pick
+                and pick in {o.get("offence_id") for o in c.offences}]
+        rel_ids = related_offences(kb, pick)
+        related = [c for c in usable if c.principal_offence_id in rel_ids and c not in also]
+        other = [c for c in usable if c.principal_offence_id not in (rel_ids | {pick}) and c not in also]
+        unlabelled = [c for c in other if c.principal_offence_id not in kb.offences]
+        st.dataframe([{"Tier": "Same offence", "Cases in use": len(same)},
+                      {"Tier": "The charge also among the offences", "Cases in use": len(also)},
+                      {"Tier": "Same section of the register (" + ", ".join(sorted(
+                          NAME_OF.get(o, o).split(" — ")[0] for o in rel_ids))[:120] + ")", "Cases in use": len(related)},
+                      {"Tier": "Other offences — not used", "Cases in use": len(other)},
+                      {"Tier": "   of which “Other offence” (no register label)", "Cases in use": len(unlabelled)}],
+                     hide_index=True, width="stretch")
+        would = len(same) + len(also) + len(related)
+        if not would:
+            st.error(f"No case in use would reach an estimate for this charge. {len(other)} case(s) are for other "
+                     "offences" + (f", {len(unlabelled)} with no register label (if their names match a register "
+                                   "offence, press Relabel below; otherwise set the principal offence in the table)."
+                                   if unlabelled else "."))
+        else:
+            missing = [c for c in same + also + related if c.id not in db.vectors]
+            st.success(f"{would} case(s) would be compared, up to {config.CASES_FOR_COMPARISON} shown"
+                       + (f"; {len(missing)} of them have no embeddings, so they are ranked by keywords until embedded."
+                          if missing else ", ranked by cosine similarity."))
 
 
 def embed_now(note_prefix: str = "") -> None:

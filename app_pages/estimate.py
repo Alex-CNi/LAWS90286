@@ -107,9 +107,10 @@ def form_defaults() -> dict:
     return d
 
 
-def write_form(values: dict) -> None:
+def write_form(values: dict, widgets: bool = True) -> None:
     """Put case values into the form: the lasting copy and the widgets. Call it from a callback or before
-    the widgets are drawn (Streamlit does not let a drawn widget's value be set)."""
+    the widgets are drawn (Streamlit does not let a drawn widget's value be set); `widgets=False` updates the
+    lasting copy only (for code that runs while the widgets are drawn and leaves them to the next run)."""
     form = dict(values)
     if "offence_date_end" in form:
         form["has_period"] = form["offence_date_end"] is not None
@@ -120,8 +121,9 @@ def write_form(values: dict) -> None:
     if "indication_max_months" in form:
         form["indication_max_months"] = form["indication_max_months"] or 0
     st.session_state.form_shadow.update(form)
-    for key, value in form.items():
-        st.session_state[f"f_{key}"] = value
+    if widgets:
+        for key, value in form.items():
+            st.session_state[f"f_{key}"] = value
 
 
 def init_form():
@@ -936,10 +938,16 @@ def simple_input() -> None:
     stale = srt is not None and srt.description.strip() != description
     fresh = srt is None or stale
     too_short = len(description) < 80
-    if st.button("Sort my description (AI) →" if fresh else "Sort it again (AI)",
-                 type="primary" if fresh else "secondary", disabled=not has_key() or too_short,
-                 help="Sorting sets every question you have not answered yourself from the description (or leaves "
-                      "it open); your own answers are kept."):
+    b1, b2 = st.columns([3, 2])
+    if b1.button("Estimate — every AI call, no further clicks →", type="primary", disabled=not has_key() or too_short,
+                 help="Sorts the description, extracts the facts, confirms them as extracted, works out the legal "
+                      "framework, runs the four analyses, proposes a sentence, checks and audits it. Answers that count "
+                      "against the offender are not applied unless you tick them below and press the button again."):
+        run_everything(description)
+        st.rerun()
+    if b2.button("Sort my description only (AI)" if fresh else "Sort it again (AI)", disabled=not has_key() or too_short,
+                 help="Sorting alone: see what the AI reads from the description, tick any answer against the "
+                      "offender that is proved, then press Estimate."):
         sort_now(description)
         st.rerun()
     if too_short:
@@ -950,6 +958,74 @@ def simple_input() -> None:
                    "tick.")
     if srt is not None:
         show_sorted(srt, stale)
+
+
+def begin_run() -> Run | None:
+    """Start a new run from the form: AI call 1 (the facts). Returns the run, or None if the case is refused
+    (the problems are shown) or the call failed (the error is kept for the page)."""
+    case = case_from_form()
+    problems = validate(case, kb)
+    if problems:
+        for p in problems:
+            st.error(p)
+        return None
+    st.session_state.last_error = ""
+    previous = st.session_state.get("run")
+    run = Run(case=case, models=dict(st.session_state.models), efforts=dict(st.session_state.efforts))
+    attach_sort_calls(run)                     # simple input: the sorting call is this run's first call
+    if previous is not None and previous.extraction is None:     # an earlier attempt that failed
+        run.discarded_calls += [replace(c, note=c.note or "an earlier attempt that failed")
+                                for c in previous.calls + previous.discarded_calls if c.step != SORT_STEP]
+    st.session_state.run = run
+    with st.spinner("AI call 1 — structuring the facts…"):
+        try:
+            step_extract(run, llm_for(run), kb)
+            if st.session_state.get("sorted_record") is not None and st.session_state.get("sort_counted_by") is None:
+                st.session_state.sort_counted_by = run.run_id
+            st.session_state.pending_calls = []   # now in this run's log
+        except LLMError as exc:
+            st.session_state.last_error = str(exc)
+            return None
+    return run
+
+
+def run_everything(description: str) -> None:
+    """The simple input's one button: every AI call in turn, with no further click — sort the description (if it
+    has not been sorted as it now reads), extract the facts (AI call 1), confirm them as extracted (nothing an
+    answer against the offender could add is applied: the suggestions stay unticked, as the simple input's rule
+    requires), work out the framework, then the analyses, the proposal, the checks and the audit (AI calls 2–7,
+    and the revision if needed). Stops, and says why, if the description leaves a required question open."""
+    ss = st.session_state
+    srt = ss.get("sorted")
+    if srt is None or srt.description.strip() != description.strip():
+        sort_now(description)                                   # writes ss.pending_form for the next run…
+        if ss.get("last_error"):
+            return
+        if ss.get("pending_form"):                              # …and this run goes on from the lasting copy now
+            write_form(ss.pending_form, widgets=False)          # (the widgets are drawn: they follow on the rerun)
+    missing = required_missing()
+    if missing:
+        ss.last_error = ("The description does not state " + ", ".join(missing) + ". Answer in the boxes above "
+                         "(or add it to the description) and press the button again; the sorting is kept.")
+        return
+    with st.status("Working — every AI call runs now; this usually takes a few minutes…", expanded=True) as status:
+        status.write("AI call 1 — the facts")
+        run = begin_run()
+        if run is None or run.extraction is None:
+            status.update(label="Stopped at AI call 1", state="error")
+            return
+        status.write("The facts as extracted (none of the suggested answers applied) → the legal framework (code)")
+        step_confirm(run, kb, run.fact_rows, {})
+        case_db = get_case_db()
+        try:
+            run_remaining(run, llm_for(run), kb, retriever, progress=status.write,
+                          parallel=ss.get("parallel", config.PARALLEL_STAGES),
+                          case_db=case_db, exclude_case_ids=ss.get("cdb_exclude", []))
+            status.update(label="Finished", state="complete")
+            ss.last_error = ""
+        except LLMError as exc:
+            status.update(label="Stopped", state="error")
+            ss.last_error = f"{exc} — the steps already done are kept; press Continue in Step 3 to retry."
 
 
 def detailed_input() -> None:
@@ -1146,30 +1222,13 @@ with st.expander("**Step 1 — The case**", expanded=run is None):      # a fixe
         blocked = "Sort the description again first: it has changed."
     elif required_missing():
         blocked = "Still needed before AI call 1: " + ", ".join(required_missing()) + "."
-    if st.button("Extract the facts (AI call 1) →", type="primary", disabled=not has_key() or bool(blocked)):
-        case = case_from_form()
-        problems = validate(case, kb)
-        if problems:
-            for p in problems:
-                st.error(p)
-        else:
-            st.session_state.last_error = ""
-            previous = st.session_state.get("run")
-            run = Run(case=case, models=dict(st.session_state.models), efforts=dict(st.session_state.efforts))
-            attach_sort_calls(run)                     # simple input: the sorting call is this run's first call
-            if previous is not None and previous.extraction is None:     # an earlier attempt that failed
-                run.discarded_calls += [replace(c, note=c.note or "an earlier attempt that failed")
-                                        for c in previous.calls + previous.discarded_calls if c.step != SORT_STEP]
-            st.session_state.run = run
-            with st.spinner("AI call 1 — structuring the facts…"):
-                try:
-                    step_extract(run, llm_for(run), kb)
-                    if st.session_state.get("sorted_record") is not None and \
-                            st.session_state.get("sort_counted_by") is None:
-                        st.session_state.sort_counted_by = run.run_id
-                    st.session_state.pending_calls = []   # now in this run's log
-                except LLMError as exc:
-                    st.session_state.last_error = str(exc)
+    # The simple input runs everything from its Estimate button; this button is its step-by-step alternative
+    # (sort, check the ticks, extract, confirm by hand) and the detailed input's only way.
+    if st.button("Extract the facts only (AI call 1) →" if simple else "Extract the facts (AI call 1) →",
+                 type="secondary" if simple else "primary", disabled=not has_key() or bool(blocked),
+                 help="Step by step: the facts first, to check and confirm them yourself before the other calls."
+                 if simple else None):
+        if begin_run():
             st.rerun()
     if blocked:
         st.caption(blocked)
