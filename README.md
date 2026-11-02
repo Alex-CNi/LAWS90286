@@ -28,12 +28,12 @@ The harness controls what each API call is asked to do, the material it receives
 
 | Step | What happens |
 |---|---|
-| Facts — call 1 | The model extracts material facts, gives supporting words from the narrative and identifies missing information. The user can correct or remove facts before confirming them. |
-| Legal framework — code | The application works out the applicable maximum, offence category, minimums and available sentencing options from the selected charge, dates and answers. |
-| Analysis — calls 2–5 | Four parallel calls consider the gravity of the offending, the offender's circumstances, sentencing purposes, and current practice and comparable cases. Each returns its reasoning separately. |
-| Synthesis — call 6 | The model brings those analyses together and proposes a sentence and indicative range, with reasons and references. |
-| Checks and audit — code and call 7 | Code checks rules such as maximum penalties and non-parole requirements. A further AI call reviews the reasoning against standards drawn from the Manual. |
-| Revision — calls 8–9, if needed | If the checks or audit report an error, the proposal is sent back with the problems identified. It is revised, checked again and re-audited once. Remaining problems are shown with the result. |
+| Facts - call 1 | The model extracts material facts, gives supporting words from the narrative and identifies missing information. The user can correct or remove facts before confirming them. |
+| Legal framework - code | The application works out the applicable maximum, offence category, minimums and available sentencing options from the selected charge, dates and answers. |
+| Analysis - calls 2–5 | Four parallel calls consider the gravity of the offending, the offender's circumstances, sentencing purposes, and current practice and comparable cases. Each returns its reasoning separately. |
+| Synthesis - call 6 | The model brings those analyses together and proposes a sentence and indicative range, with reasons and references. |
+| Checks and audit - code and call 7 | Code checks rules such as maximum penalties and non-parole requirements. A further AI call reviews the reasoning against standards drawn from the Manual. |
+| Revision - calls 8-9, if needed | If the checks or audit report an error, the proposal is sent back with the problems identified. It is revised, checked again and re-audited once. Remaining problems are shown with the result. |
 
 A normal completed run makes **seven AI calls**. Simple input adds one sorting call; revision adds two. Search embeddings are separate. The run log records the calls, and completed steps are retained when the page refreshes.
 
